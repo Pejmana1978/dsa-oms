@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Btn from '../components/Btn'
 import { RoleBadge } from '../components/Badges'
-import Modal from './Modal'
+import Modal from '../components/Modal'
 import { fetchProfiles, updateProfile } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
