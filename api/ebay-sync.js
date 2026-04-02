@@ -7,8 +7,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
-          'Authorization': 'Bearer ' + process.env.REACT_APP_SUPABASE_ANON_KEY
+          'Authorization': 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY
         },
         body: '{}'
       }
