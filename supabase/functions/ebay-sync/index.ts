@@ -21,26 +21,25 @@ async function getEbayToken() {
   return data.access_token
 }
 
+async function getThumbnail(token: string, itemId: string): Promise<string> {
+  try {
+    const res = await fetch(`https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|0?fieldgroups=PRODUCT`, {
+      headers: { "Authorization": `Bearer ${token}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB" },
+    })
+    const data = await res.json()
+    return data.image?.imageUrl || data.additionalImages?.[0]?.imageUrl || ""
+  } catch {
+    return ""
+  }
+}
+
 function formatPhone(phone: string) {
   if (!phone) return ""
   const cleaned = phone.replace(/[\s\-().]/g, "")
+  if (cleaned.length < 7) return ""
   if (cleaned.startsWith("00")) return "+" + cleaned.slice(2)
   if (!cleaned.startsWith("+")) return "+" + cleaned
   return cleaned
-}
-
-function buildAddress(shipTo: Record<string, unknown>) {
-  if (!shipTo) return ""
-  const addr = shipTo.contactAddress as Record<string, unknown> || {}
-  const parts = [
-    addr.addressLine1,
-    addr.addressLine2,
-    addr.city,
-    addr.stateOrProvince,
-    addr.postalCode,
-    addr.countryCode,
-  ].filter(Boolean)
-  return parts.join(", ")
 }
 
 serve(async () => {
@@ -65,10 +64,7 @@ serve(async () => {
       const shipTo = fulfillment.shippingStep?.shipTo || {}
       const contactAddr = shipTo.contactAddress || {}
 
-      const shippingPhone = formatPhone(shipTo.primaryPhone?.phoneNumber || "")
-      const buyerPhone = formatPhone(buyer.taxAddress?.phone || buyer.buyerRegistrationAddress?.phone || "")
-      const phones = [shippingPhone, buyerPhone].filter((p, i, arr) => p && arr.indexOf(p) === i)
-      const phoneStr = phones.join(" / ")
+      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "")
 
       const address = [
         contactAddr.addressLine1,
@@ -79,10 +75,11 @@ serve(async () => {
         contactAddr.countryCode,
       ].filter(Boolean).join(", ")
 
-      const email = buyer.buyerRegistrationAddress?.email || ""
-      const sku = item.sku || item.legacyItemId || ""
-      const thumbnail = item.image?.imageUrl || ""
-      const price = item.total?.value ? `${item.total.value} ${item.total.currency}` : ""
+      const legacyItemId = item.legacyItemId || ""
+      const thumbnail = legacyItemId ? await getThumbnail(token, legacyItemId) : ""
+
+      const sku = item.sku || legacyItemId || ""
+      const price = item.lineItemCost?.value ? `${item.lineItemCost.value} ${item.lineItemCost.currency}` : ""
       const buyerUsername = buyer.username || ""
 
       const notes = [
@@ -92,11 +89,11 @@ serve(async () => {
         price ? `Price: ${price}` : "",
       ].filter(Boolean).join(" | ")
 
-      await supabase.from("orders").insert({
+      const { error } = await supabase.from("orders").insert({
         order_ref: ref,
         customer_name: shipTo.fullName || buyerUsername || "eBay Customer",
-        email: email,
-        phone: phoneStr,
+        email: "",
+        phone: phone,
         address: address,
         car: item.title || "See eBay order",
         seats: "Full set (5)",
@@ -108,7 +105,7 @@ serve(async () => {
         order_date: order.creationDate ? order.creationDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
         photos: [],
       })
-      imported++
+      if (!error) imported++
     }
 
     return new Response(JSON.stringify({ success: true, imported, total: ebayOrders.length }), {
