@@ -27,6 +27,17 @@ export default function ShippingPage({ orders, setOrders, role }) {
     } catch (e) { toast(e.message, 'error') }
   }
 
+  function downloadPDF(base64, trackingNumber) {
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    const blob = new Blob([bytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `label-${trackingNumber}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function upsLabel(o) {
     if (!o.address) { toast('No address on this order', 'error'); return; }
     setLabelLoading(prev => ({ ...prev, [o.id]: 'validating' }))
@@ -59,10 +70,9 @@ export default function ShippingPage({ orders, setOrders, role }) {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       const { updateOrder } = await import('../lib/api')
-      const updated = await updateOrder(o.id, { tracking_number: data.trackingNumber })
+      const updated = await updateOrder(o.id, { tracking_number: data.trackingNumber, label_pdf: data.labelBase64 })
       setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
-      const pdf = `data:application/pdf;base64,${data.labelBase64}`
-      window.open(pdf, '_blank')
+      downloadPDF(data.labelBase64, data.trackingNumber)
       toast(`Label created — tracking: ${data.trackingNumber}`)
     } catch(e) { toast(e.message, 'error') }
     setLabelLoading(prev => ({ ...prev, [o.id]: null }))
@@ -110,7 +120,7 @@ export default function ShippingPage({ orders, setOrders, role }) {
                   <td style={{ padding: '9px 11px' }}><StageBadge stage={o.stage} /></td>
                   <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
                     <div style={{ display: 'flex', gap: 5 }}>
-                      <Btn size="sm" onClick={() => upsLabel(o)} disabled={!!labelLoading[o.id]}>{labelLoading[o.id] === 'validating' ? 'Validating…' : labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}</Btn>
+                      <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>{labelLoading[o.id] === 'validating' ? 'Validating…' : labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}</Btn>
                       <Btn size="sm" variant="success" onClick={() => advance(o.id)}>Advance</Btn>
                     </div>
                   </td>

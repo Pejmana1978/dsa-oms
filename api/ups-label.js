@@ -76,6 +76,7 @@ async function createLabel(token, order) {
             BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER }
           }
         },
+        RateInformation: { NegotiatedRatesIndicator: '' },
         Service: { Code: '11', Description: 'UPS Standard' },
         Package: {
           Packaging: { Code: '02' },
