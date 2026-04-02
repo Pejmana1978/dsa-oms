@@ -108,8 +108,8 @@ export default function OrdersPage({ orders, setOrders, role }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ background: '#f9f9f8' }}>
-              {['ID', 'Customer', 'Source', 'Product', 'Status', 'Date', 'Actions'].map((h, i) => (
-                <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [80, 130, 70, 160, 95, 70, 110][i] }}>{h}</th>
+              {['ID', 'Customer', 'Source', '', 'Product', 'Status', 'Date', 'Actions'].map((h, i) => (
+                <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [80, 130, 70, 48, 160, 95, 70, 110][i] }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -127,6 +127,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
                   <div style={{ fontSize: 10, color: '#aaa' }}>{o.phone}</div>
                 </td>
                 <td style={{ padding: '9px 11px' }}><SourceBadge source={o.source} /></td>
+                <td style={{ padding: '4px 6px' }}>{o.thumbnail ? <img src={o.thumbnail} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />}</td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ fontSize: 12 }}>{o.car}</div>
                   <div style={{ fontSize: 10, color: '#aaa' }}>{o.seats} · {o.color}</div>
