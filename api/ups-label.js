@@ -61,6 +61,7 @@ async function createLabel(token, order) {
         },
         ShipTo: {
           Name: order.customer_name,
+          AttentionName: order.customer_name,
           Phone: { Number: order.phone || '' },
           Address: {
             AddressLine: addressLine,
