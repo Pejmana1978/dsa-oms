@@ -19,9 +19,16 @@ export default function OrdersPage({ orders, setOrders, role }) {
   async function syncEbay() {
   setSyncing(true)
   try {
-    const { data, error } = await supabase.functions.invoke('ebay-sync', { body: {} })
-    if (error) throw error
-    toast(`Imported ${data.imported} new eBay order${data.imported !== 1 ? 's' : ''}`)
+    const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY
+    const url = process.env.REACT_APP_SUPABASE_URL + '/functions/v1/ebay-sync'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': anonKey, 'Authorization': 'Bearer ' + anonKey },
+      body: '{}'
+    })
+    const data = await res.json()
+    if (data.error) throw new Error(data.error)
+    toast('Imported ' + data.imported + ' new eBay order' + (data.imported !== 1 ? 's' : ''))
     if (data.imported > 0) window.location.reload()
   } catch (e) { toast(e.message || 'Sync failed', 'error') }
   setSyncing(false)
