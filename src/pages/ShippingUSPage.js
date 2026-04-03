@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { StageBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
@@ -27,41 +28,69 @@ export default function ShippingUSPage({ orders, setOrders, role }) {
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: '#888' }}>{queue.length} order{queue.length !== 1 ? 's' : ''} ready to ship from USA</span>
+      </div>
       {queue.length === 0 && (
         <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: 32, textAlign: 'center', fontSize: 12, color: '#bbb' }}>
           No orders ready to ship from USA
         </div>
       )}
-      {queue.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-            <thead>
-              <tr style={{ background: '#f9f9f8' }}>
-                {['Order ID', 'Car', 'Position', 'Material', 'Color / Trim', 'Qty', 'Actions'].map((h, i) => (
-                  <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [90, 180, 160, 120, 120, 40, 100][i] }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {queue.map(o => (
-                <tr key={o.id} onClick={() => setSelected(o)} style={{ cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fafaf9'}
-                  onMouseLeave={e => e.currentTarget.style.background = ''}>
-                  <td style={{ padding: '9px 11px', fontSize: 11, fontWeight: 600, color: '#185FA5' }}>{o.order_ref}</td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{o.car}</td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{(o.position || []).join(', ') || '—'}</td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{o.material || '—'}</td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{o.color || '—'}</td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{o.quantity || 1}</td>
-                  <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
-                    <Btn size="sm" variant="primary" onClick={() => advance(o.id)}>Mark Shipped</Btn>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {queue.map(o => (
+        <div key={o.id} style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div style={{ cursor: 'pointer' }} onClick={() => setSelected(o)}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.stage}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <StageBadge stage={o.stage} />
+              <Btn size="sm" variant="primary" onClick={() => advance(o.id)}>Mark Shipped</Btn>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+            {[
+              ['Car', o.car],
+              ['Position', (o.position || []).join(', ') || '—'],
+              ['Material', o.material || '—'],
+              ['Color / Trim', o.color || '—'],
+              ['Quantity', o.quantity || 1],
+              ['VIN', o.vin || '—'],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            {o.thumbnail && (
+              <div>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>eBay listing</div>
+                <img src={o.thumbnail} alt="eBay" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+              </div>
+            )}
+            {(o.photos || []).filter(p => {
+              const ext = (p.name || '').split('.').pop().toLowerCase()
+              return ['jpg','jpeg','png','gif','webp'].includes(ext) && p.url
+            }).length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>Customer photos</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {o.photos.filter(p => {
+                    const ext = (p.name || '').split('.').pop().toLowerCase()
+                    return ['jpg','jpeg','png','gif','webp'].includes(ext) && p.url
+                  }).map((p, i) => (
+                    <a key={i} href={p.url} target="_blank" rel="noreferrer">
+                      <img src={p.url} alt="" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      ))}
       {selected && <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />}
     </>
   )

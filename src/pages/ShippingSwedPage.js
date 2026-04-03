@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { StageBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
@@ -40,26 +41,6 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
 
   async function upsLabel(o) {
     if (!o.address) { toast('No address on this order', 'error'); return }
-    setLabelLoading(prev => ({ ...prev, [o.id]: 'validating' }))
-    try {
-      const valRes = await fetch('/api/ups-label', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order: o, validateOnly: true })
-      })
-      const valData = await valRes.json()
-      const candidates = valData.validation?.XAVResponse?.Candidate
-      const ambiguous = Array.isArray(candidates) && candidates.length > 1
-      if (ambiguous) {
-        toast('Address needs verification — open order to edit', 'error')
-        setLabelLoading(prev => ({ ...prev, [o.id]: null }))
-        return
-      }
-      await generateLabel(o)
-    } catch(e) { toast(e.message, 'error'); setLabelLoading(prev => ({ ...prev, [o.id]: null })) }
-  }
-
-  async function generateLabel(o) {
     setLabelLoading(prev => ({ ...prev, [o.id]: 'generating' }))
     try {
       const res = await fetch('/api/ups-label', {
@@ -105,74 +86,92 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
 
   return (
     <>
-      <div style={{ marginBottom: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: '#888' }}>{queue.length} order{queue.length !== 1 ? 's' : ''} in Sweden shipping pipeline</span>
         <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
           <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
-          Show delivered orders
+          Show delivered
         </label>
       </div>
       {queue.length === 0 && (
         <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: 32, textAlign: 'center', fontSize: 12, color: '#bbb' }}>
-          No orders to ship from Sweden
+          No orders in Sweden shipping pipeline
         </div>
       )}
-      {queue.length > 0 && (
-        <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-            <thead>
-              <tr style={{ background: '#f9f9f8' }}>
-                {['Order ID', 'Customer', 'Address', 'Product', 'Status', 'Actions'].map((h, i) => (
-                  <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [90, 130, 180, 150, 100, 160][i] }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {queue.map(o => (
-                <tr key={o.id} onClick={() => setSelected(o)} style={{ cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fafaf9'}
-                  onMouseLeave={e => e.currentTarget.style.background = ''}>
-                  <td style={{ padding: '9px 11px', fontSize: 11, fontWeight: 600, color: '#185FA5' }}>{o.order_ref}</td>
-                  <td style={{ padding: '9px 11px' }}>
-                    <div style={{ fontSize: 12 }}>{o.customer_name}</div>
-                    <div style={{ fontSize: 10, color: '#aaa' }}>{o.phone}</div>
-                  </td>
-                  <td style={{ padding: '9px 11px', fontSize: 11, color: '#555' }}>{o.address || '—'}</td>
-                  <td style={{ padding: '9px 11px' }}>
-                    <div style={{ fontSize: 12 }}>{o.car}</div>
-                    <div style={{ fontSize: 10, color: '#aaa' }}>{(o.position || []).join(', ')} · {o.material}</div>
-                  </td>
-                  <td style={{ padding: '9px 11px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 500 }}>{o.stage}</div>
-                    {o.tracking_number && (
-                      <a href={'https://www.ups.com/track?tracknum=' + o.tracking_number} target="_blank" rel="noreferrer"
-                        style={{ fontSize: 10, color: '#185FA5', display: 'block', textDecoration: 'none' }}>📦 {o.tracking_number}</a>
-                    )}
-                    {o.delivered_at && <div style={{ fontSize: 10, color: '#27a069' }}>✅ {o.delivered_at.slice(0,10).split('-').reverse().join('/')}</div>}
-                    {deliveryStatus[o.id] && deliveryStatus[o.id] !== 'checking' && !o.delivered_at && <div style={{ fontSize: 10, color: '#888' }}>{deliveryStatus[o.id]}</div>}
-                  </td>
-                  <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {o.stage === 'Shipped to Sweden' && (
-                        <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>
-                          {labelLoading[o.id] === 'validating' ? 'Validating…' : labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}
-                        </Btn>
-                      )}
-                      {o.stage === 'Shipped to Sweden' && o.tracking_number && (
-                        <Btn size="sm" variant="primary" onClick={() => advance(o.id, 'Shipped to Customer')}>Mark Shipped</Btn>
-                      )}
-                      {o.stage === 'Shipped to Customer' && !o.delivered_at && (
-                        <Btn size="sm" onClick={() => checkDelivery(o)} disabled={deliveryStatus[o.id] === 'checking'}>
-                          {deliveryStatus[o.id] === 'checking' ? '…' : '🔄 Check'}
-                        </Btn>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {queue.map(o => (
+        <div key={o.id} style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div style={{ cursor: 'pointer' }} onClick={() => setSelected(o)}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.customer_name} — {o.address}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <StageBadge stage={o.stage} />
+              {o.stage === 'Shipped to Sweden' && (
+                <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>
+                  {labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}
+                </Btn>
+              )}
+              {o.stage === 'Shipped to Sweden' && o.tracking_number && (
+                <Btn size="sm" variant="primary" onClick={() => advance(o.id, 'Shipped to Customer')}>Mark Shipped</Btn>
+              )}
+              {o.stage === 'Shipped to Customer' && !o.delivered_at && (
+                <Btn size="sm" onClick={() => checkDelivery(o)} disabled={deliveryStatus[o.id] === 'checking'}>
+                  {deliveryStatus[o.id] === 'checking' ? '…' : '🔄 Check delivery'}
+                </Btn>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
+            {[
+              ['Car', o.car],
+              ['Position', (o.position || []).join(', ') || '—'],
+              ['Material', o.material || '—'],
+              ['Color / Trim', o.color || '—'],
+              ['Quantity', o.quantity || 1],
+              ['VIN', o.vin || '—'],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {o.tracking_number && (
+            <div style={{ marginBottom: 8 }}>
+              <a href={'https://www.ups.com/track?tracknum=' + o.tracking_number} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>📦 {o.tracking_number}</a>
+              {o.delivered_at && <span style={{ fontSize: 11, color: '#27a069', marginLeft: 10 }}>✅ Delivered {o.delivered_at.slice(0,10).split('-').reverse().join('/')}</span>}
+              {deliveryStatus[o.id] && deliveryStatus[o.id] !== 'checking' && !o.delivered_at && <span style={{ fontSize: 11, color: '#888', marginLeft: 10 }}>{deliveryStatus[o.id]}</span>}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            {o.thumbnail && (
+              <div>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>eBay listing</div>
+                <img src={o.thumbnail} alt="eBay" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+              </div>
+            )}
+            {(o.photos || []).filter(p => {
+              const ext = (p.name || '').split('.').pop().toLowerCase()
+              return ['jpg','jpeg','png','gif','webp'].includes(ext) && p.url
+            }).length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>Customer photos</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {o.photos.filter(p => {
+                    const ext = (p.name || '').split('.').pop().toLowerCase()
+                    return ['jpg','jpeg','png','gif','webp'].includes(ext) && p.url
+                  }).map((p, i) => (
+                    <a key={i} href={p.url} target="_blank" rel="noreferrer">
+                      <img src={p.url} alt="" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      ))}
       {selected && <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />}
     </>
   )
