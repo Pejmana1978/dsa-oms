@@ -36,6 +36,8 @@ export default function OrdersPage({ orders, setOrders, role }) {
 
   const filtered = useMemo(() => {
     return orders.filter(o => {
+      if (o.stage === 'Delivered') return false
+      if (o.stage === 'Delivered') return false
       if (stageFilter !== 'All' && o.stage !== stageFilter) return false
       if (srcFilter && o.source !== srcFilter) return false
       if (q) {

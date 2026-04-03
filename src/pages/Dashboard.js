@@ -9,6 +9,7 @@ import ShippingPage from './ShippingPage'
 import ShippingUSPage from './ShippingUSPage'
 import ShippingSwedPage from './ShippingSwedPage'
 import StockPage from './StockPage'
+import ArchivePage from './ArchivePage'
 import StatsPage from './StatsPage'
 import UsersPage from './UsersPage'
 
@@ -21,6 +22,7 @@ const NAV_ICONS = {
   shipping_us: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/></svg>,
   shipping_sweden: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/></svg>,
   stock: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 7h6M7 4v6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
+  archive: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1 6h12" stroke="currentColor" strokeWidth="1.2"/><path d="M5 8.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 }
 
 export default function Dashboard() {
@@ -136,6 +138,7 @@ export default function Dashboard() {
               {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'stock' && <StockPage />}
+              {activePage === 'archive' && <ArchivePage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'stats' && <StatsPage orders={orders} />}
               {activePage === 'users' && <UsersPage />}
             </>

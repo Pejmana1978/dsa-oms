@@ -10,8 +10,8 @@ export const STAGES = [
 ]
 
 export const ROLE_PAGES = {
-  admin:           ['orders', 'production', 'shipping', 'stock', 'stats', 'users'],
-  sales:           ['orders', 'stats'],
+  admin:           ['orders', 'production', 'shipping', 'stock', 'stats', 'archive', 'users'],
+  sales:           ['orders', 'stats', 'archive'],
   production:      ['production'],
   shipping_us:     ['shipping_us'],
   shipping_sweden: ['shipping_sweden'],
@@ -23,6 +23,7 @@ export const PAGE_LABELS = {
   shipping_us:     'Shipping (USA)',
   shipping_sweden: 'Shipping (Sweden)',
   stock:           'Sweden stock',
+  archive:         'Archive',
   stats:           'Overview',
   users:           'Users',
 }
