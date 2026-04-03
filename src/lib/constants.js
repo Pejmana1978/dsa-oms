@@ -10,7 +10,7 @@ export const STAGES = [
 ]
 
 export const ROLE_PAGES = {
-  admin:           ['orders', 'production', 'shipping', 'stock', 'stats', 'archive', 'users'],
+  admin:           ['orders', 'production', 'shipping_us', 'shipping_sweden', 'stock', 'stats', 'archive', 'users'],
   sales:           ['orders', 'stats', 'archive'],
   production:      ['production'],
   shipping_us:     ['shipping_us'],
