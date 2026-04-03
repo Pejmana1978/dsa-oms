@@ -87,7 +87,7 @@ serve(async () => {
       const shipTo = fulfillment.shippingStep?.shipTo || {}
       const contactAddr = shipTo.contactAddress || {}
 
-      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "", contactAddr.countryCode || "")
+      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "")
 
       const address = [
         contactAddr.addressLine1,
