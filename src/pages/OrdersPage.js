@@ -36,8 +36,8 @@ export default function OrdersPage({ orders, setOrders, role }) {
 
   const filtered = useMemo(() => {
     return orders.filter(o => {
-      if (o.stage === 'Delivered') return false
-      if (o.stage === 'Delivered') return false
+      if (o.archived) return false
+      if (o.archived) return false
       if (stageFilter !== 'All' && o.stage !== stageFilter) return false
       if (srcFilter && o.source !== srcFilter) return false
       if (q) {
@@ -58,6 +58,15 @@ export default function OrdersPage({ orders, setOrders, role }) {
       const updated = await updateOrder(id, { stage: newStage })
       setOrders(prev => prev.map(x => x.id === id ? updated : x))
       toast(`${o.order_ref} → "${newStage}"`)
+    } catch (e) { toast(e.message, 'error') }
+  }
+
+  async function handleArchive(id, ref) {
+    if (!window.confirm('Archive order ' + ref + '?')) return
+    try {
+      const updated = await updateOrder(id, { archived: true })
+      setOrders(prev => prev.map(x => x.id === id ? updated : x))
+      toast(ref + ' archived')
     } catch (e) { toast(e.message, 'error') }
   }
 
@@ -139,6 +148,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
                 <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>
+                    {(role === 'admin' || role === 'sales') && <Btn size="sm" onClick={e => { e.stopPropagation(); handleArchive(o.id, o.order_ref) }}>Archive</Btn>}
                     {role === 'admin' && <Btn size="sm" variant="danger" onClick={() => handleDelete(o.id, o.order_ref)}>✕</Btn>}
                   </div>
                 </td>

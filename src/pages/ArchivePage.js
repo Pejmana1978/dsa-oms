@@ -7,7 +7,7 @@ export default function ArchivePage({ orders, setOrders, role }) {
 
   const archived = useMemo(() => {
     return orders.filter(o => {
-      if (o.stage !== 'Delivered') return false
+      if (!o.archived) return false
       if (q) {
         const qs = q.toLowerCase()
         if (!`${o.order_ref}${o.customer_name}${o.car}${o.notes || ''}`.toLowerCase().includes(qs)) return false
@@ -15,6 +15,14 @@ export default function ArchivePage({ orders, setOrders, role }) {
       return true
     })
   }, [orders, q])
+
+  async function handleUnarchive(id, ref) {
+    try {
+      const { updateOrder } = await import('../lib/api')
+      const updated = await updateOrder(id, { archived: false })
+      setOrders(prev => prev.map(x => x.id === id ? updated : x))
+    } catch (e) { alert(e.message) }
+  }
 
   function handleUpdated(updated) {
     setOrders(prev => prev.map(x => x.id === updated.id ? updated : x))
@@ -37,7 +45,7 @@ export default function ArchivePage({ orders, setOrders, role }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <thead>
               <tr style={{ background: '#f9f9f8' }}>
-                {['ID', 'Customer', 'Product', 'Color / Trim', 'Delivered', 'Tracking'].map((h, i) => (
+                {['ID', 'Customer', 'Product', 'Color / Trim', 'Delivered', 'Tracking', ''].map((h, i) => (
                   <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [110, 140, 200, 120, 80, 130][i] }}>{h}</th>
                 ))}
               </tr>
@@ -64,6 +72,9 @@ export default function ArchivePage({ orders, setOrders, role }) {
                     {o.tracking_number
                       ? <a href={'https://www.ups.com/track?tracknum=' + o.tracking_number} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>📦 {o.tracking_number}</a>
                       : <span style={{ fontSize: 11, color: '#aaa' }}>—</span>}
+                  </td>
+                  <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleUnarchive(o.id, o.order_ref)} style={{ fontSize: 11, color: '#888', background: 'none', border: '1px solid #e0ddd8', borderRadius: 4, padding: '3px 8px', cursor: 'pointer' }}>Unarchive</button>
                   </td>
                 </tr>
               ))}
