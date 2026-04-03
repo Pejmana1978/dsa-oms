@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { StageBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
+import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 
@@ -115,6 +116,7 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
               {o.stage === 'Shipped to Sweden' && o.tracking_number && (
                 <Btn size="sm" variant="primary" onClick={() => advance(o.id, 'Shipped to Customer')}>Mark Shipped</Btn>
               )}
+              <Btn size="sm" onClick={() => printPackingSlip(o)}>Packing slip</Btn>
               {o.stage === 'Shipped to Customer' && !o.delivered_at && (
                 <Btn size="sm" onClick={() => checkDelivery(o)} disabled={deliveryStatus[o.id] === 'checking'}>
                   {deliveryStatus[o.id] === 'checking' ? '…' : '🔄 Check delivery'}
