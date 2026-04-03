@@ -68,3 +68,17 @@ export async function updateProfile(id, updates) {
   if (error) throw error
   return data
 }
+
+export async function fetchStock() {
+  const { data, error } = await supabase.from('stock').select('*').order('model').order('type').order('colour')
+  if (error) throw error
+  return data
+}
+
+export async function decrementStock(id) {
+  const { data: item } = await supabase.from('stock').select('quantity').eq('id', id).single()
+  if (!item || item.quantity <= 0) throw new Error('Item out of stock')
+  const { data, error } = await supabase.from('stock').update({ quantity: item.quantity - 1 }).eq('id', id).select().single()
+  if (error) throw error
+  return data
+}

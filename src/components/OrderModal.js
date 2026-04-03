@@ -3,6 +3,7 @@ import Modal from './Modal'
 import Btn from './Btn'
 import StageProgress from './StageProgress'
 import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
+import StockPicker from './StockPicker'
 import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
 import { useToast } from './Toast'
 
@@ -29,6 +30,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   const [tab, setTab] = useState('Details')
   const [form, setForm] = useState({ ...order })
   const [saving, setSaving] = useState(false)
+  const [showStockPicker, setShowStockPicker] = useState(false)
   const [photos, setPhotos] = useState(order.photos || [])
   const fileRef = useRef()
   const toast = useToast()
@@ -182,10 +184,22 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           <Row>
             <Field label="Quantity"><input type="number" min="1" value={form.quantity || 1} onChange={e => setF('quantity', parseInt(e.target.value))} readOnly={!canEdit} style={{ width: 80 }} /></Field>
             <Field label="Ship from Sweden stock">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 4 }}>
-                <input type="checkbox" disabled={!canEdit} checked={form.ship_from_stock || false} onChange={e => setF('ship_from_stock', e.target.checked)} />
-                Use Sweden stock (skips production)
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
+                  <input type="checkbox" disabled={!canEdit} checked={form.ship_from_stock || false} onChange={e => setF('ship_from_stock', e.target.checked)} />
+                  Use Sweden stock (skips production)
+                </label>
+                {form.ship_from_stock && canEdit && (
+                  <button onClick={() => setShowStockPicker(true)} style={{ fontSize: 11, color: '#185FA5', background: '#E6F1FB', border: '1px solid #b3d4f5', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', width: 'fit-content' }}>
+                    📦 Select from inventory
+                  </button>
+                )}
+                {form.stock_item && (
+                  <div style={{ fontSize: 11, color: '#27a069', background: '#f0faf5', border: '1px solid #9FE1CB', borderRadius: 6, padding: '5px 10px' }}>
+                    ✅ {form.stock_item.model} — {form.stock_item.type} — {form.stock_item.colour}
+                  </div>
+                )}
+              </div>
             </Field>
           </Row>
           <Row>
@@ -312,6 +326,19 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, textAlign: 'center', padding: '6px', border: '1px solid #e0ddd8', borderRadius: 4 }}>{order.order_ref}</div>
           </div>
         </div>
+      )}
+      {showStockPicker && (
+        <StockPicker
+          onClose={() => setShowStockPicker(false)}
+          onSelect={item => {
+            setF('stock_item', item)
+            setF('material', item.type)
+            setF('color', item.colour)
+            setF('car', form.car || item.model)
+            setShowStockPicker(false)
+            toast('Stock item selected — quantity will be decremented on save')
+          }}
+        />
       )}
     </Modal>
   )
