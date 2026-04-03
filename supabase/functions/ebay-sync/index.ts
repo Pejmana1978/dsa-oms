@@ -21,25 +21,48 @@ async function getEbayToken() {
   return data.access_token
 }
 
-async function getThumbnail(token: string, itemId: string): Promise<string> {
-  try {
-    const res = await fetch(`https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|0?fieldgroups=PRODUCT`, {
-      headers: { "Authorization": `Bearer ${token}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB" },
-    })
-    const data = await res.json()
-    return data.image?.imageUrl || data.additionalImages?.[0]?.imageUrl || ""
-  } catch {
-    return ""
+async function getThumbnail(token: string, itemId: string, sku: string): Promise<string> {
+  const variationId = sku ? sku.split("_")[1] || "0" : "0"
+  const urlsToTry = [
+    `https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|${variationId}?fieldgroups=PRODUCT`,
+    `https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|0?fieldgroups=PRODUCT`,
+  ]
+  for (const url of urlsToTry) {
+    try {
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${token}`, "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB" },
+      })
+      const data = await res.json()
+      const img = data.image?.imageUrl || data.additionalImages?.[0]?.imageUrl || ""
+      if (img) return img
+    } catch {
+      continue
+    }
   }
+  return ""
 }
 
-function formatPhone(phone: string) {
+const COUNTRY_CODES: Record<string, string> = {
+  GB: "44", DE: "49", FR: "33", IT: "39", ES: "34", NL: "31",
+  BE: "32", AT: "43", SE: "46", NO: "47", DK: "45", FI: "358",
+  PL: "48", PT: "351", IE: "353", CH: "41", US: "1", CA: "1",
+  AU: "61", NZ: "64", JP: "81", KR: "82", SG: "65", AE: "971",
+}
+
+function formatPhone(phone: string, countryCode = "") {
   if (!phone) return ""
-  const cleaned = phone.replace(/[\s\-().]/g, "")
+  const cleaned = phone.replace(/[\s\-().+]/g, "")
   if (cleaned.length < 7) return ""
-  if (cleaned.startsWith("00")) return "+" + cleaned.slice(2)
-  if (!cleaned.startsWith("+")) return "+" + cleaned
-  return cleaned
+  // Already has country code (doesn't start with 0)
+  if (!cleaned.startsWith("0")) {
+    if (cleaned.startsWith("00")) return "+" + cleaned.slice(2)
+    return "+" + cleaned
+  }
+  // Starts with 0 — need to replace with country code
+  const cc = COUNTRY_CODES[countryCode] || ""
+  if (cc) return "+" + cc + cleaned.slice(1)
+  // fallback — just return as-is with +
+  return "+" + cleaned
 }
 
 serve(async () => {
@@ -64,7 +87,7 @@ serve(async () => {
       const shipTo = fulfillment.shippingStep?.shipTo || {}
       const contactAddr = shipTo.contactAddress || {}
 
-      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "")
+      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "", contactAddr.countryCode || "")
 
       const address = [
         contactAddr.addressLine1,
@@ -76,7 +99,7 @@ serve(async () => {
       ].filter(Boolean).join(", ")
 
       const legacyItemId = item.legacyItemId || ""
-      const thumbnail = legacyItemId ? await getThumbnail(token, legacyItemId) : ""
+      const thumbnail = legacyItemId ? await getThumbnail(token, legacyItemId, sku) : ""
 
       const sku = item.sku || legacyItemId || ""
       const price = item.lineItemCost?.value ? `${item.lineItemCost.value} ${item.lineItemCost.currency}` : ""
