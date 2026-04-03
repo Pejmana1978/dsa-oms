@@ -54,7 +54,7 @@ serve(async () => {
     let imported = 0
 
     for (const order of ebayOrders) {
-      const ref = "EBAY-" + order.orderId.slice(-8)
+      const ref = order.orderId
       const { data: existing } = await supabase.from("orders").select("id").eq("order_ref", ref).single()
       if (existing) continue
 
@@ -83,7 +83,7 @@ serve(async () => {
       const buyerUsername = buyer.username || ""
 
       const notes = [
-        `eBay Order ID: ${order.orderId}`,
+        
         buyerUsername ? `Buyer: ${buyerUsername}` : "",
         sku ? `SKU: ${sku}` : "",
         price ? `Price: ${price}` : "",
