@@ -10,9 +10,15 @@ export default function ShippingPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
   const [labelLoading, setLabelLoading] = useState({})
   const [addressModal, setAddressModal] = useState(null)
+  const [deliveryStatus, setDeliveryStatus] = useState({})
   const toast = useToast()
 
-  const ship = orders.filter(o => ['Production completed', 'Packed', 'Shipped'].includes(o.stage))
+  const [showDelivered, setShowDelivered] = useState(false)
+  const ship = orders.filter(o => {
+    if (!['Production completed', 'Packed', 'Shipped'].includes(o.stage)) return false
+    if (!showDelivered && o.delivered_at) return false
+    return true
+  })
 
   async function advance(id) {
     const o = orders.find(x => x.id === id)
@@ -25,6 +31,28 @@ export default function ShippingPage({ orders, setOrders, role }) {
       setOrders(prev => prev.map(x => x.id === id ? updated : x))
       toast(`${o.order_ref} → "${newStage}"`)
     } catch (e) { toast(e.message, 'error') }
+  }
+
+  async function checkDelivery(o) {
+    if (!o.tracking_number) return
+    setDeliveryStatus(prev => ({ ...prev, [o.id]: 'checking' }))
+    try {
+      const res = await fetch('/api/ups-track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber: o.tracking_number })
+      })
+      const data = await res.json()
+      setDeliveryStatus(prev => ({ ...prev, [o.id]: data.status }))
+      if (data.delivered) {
+        const { updateOrder } = await import('../lib/api')
+        const updated = await updateOrder(o.id, { delivered_at: new Date().toISOString() })
+        setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
+        toast(o.order_ref + ' marked as delivered')
+      }
+    } catch (e) {
+      setDeliveryStatus(prev => ({ ...prev, [o.id]: 'Error' }))
+    }
   }
 
   function downloadPDF(base64, trackingNumber) {
@@ -92,6 +120,12 @@ export default function ShippingPage({ orders, setOrders, role }) {
         </div>
       )}
 
+      <div style={{ marginBottom: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
+          Show delivered orders
+        </label>
+      </div>
       {ship.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
@@ -111,7 +145,9 @@ export default function ShippingPage({ orders, setOrders, role }) {
                   <td style={{ padding: '9px 11px' }}>
                     <div style={{ fontSize: 12 }}>{o.customer_name}</div>
                     <div style={{ fontSize: 10, color: '#aaa' }}>{o.email}</div>
-                    {o.tracking_number && <div style={{ fontSize: 10, color: '#185FA5', marginTop: 2 }}>📦 {o.tracking_number}</div>}
+                    {o.tracking_number && <a href={'https://www.ups.com/track?tracknum=' + o.tracking_number} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#185FA5', marginTop: 2, display: 'block', textDecoration: 'none' }}>📦 {o.tracking_number}</a>}
+                    {o.delivered_at && <div style={{ fontSize: 10, color: '#27a069', marginTop: 2 }}>✅ Delivered {o.delivered_at.slice(0,10).split('-').reverse().join('/')}</div>}
+                    {deliveryStatus[o.id] && deliveryStatus[o.id] !== 'checking' && !o.delivered_at && <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{deliveryStatus[o.id]}</div>}
                   </td>
                   <td style={{ padding: '9px 11px' }}>
                     <div style={{ fontSize: 12 }}>{o.car}</div>
@@ -122,6 +158,7 @@ export default function ShippingPage({ orders, setOrders, role }) {
                     <div style={{ display: 'flex', gap: 5 }}>
                       <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>{labelLoading[o.id] === 'validating' ? 'Validating…' : labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}</Btn>
                       <Btn size="sm" variant="success" onClick={() => advance(o.id)}>Advance</Btn>
+                      {o.tracking_number && !o.delivered_at && <Btn size="sm" onClick={() => checkDelivery(o)} disabled={deliveryStatus[o.id] === 'checking'}>{deliveryStatus[o.id] === 'checking' ? '…' : '🔄'}</Btn>}
                     </div>
                   </td>
                 </tr>
