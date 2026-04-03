@@ -49,7 +49,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
     w.document.close()
   }
 
-  function printPackingSlip(o) {
+  function _unused_printPackingSlip(o) {
     const notes = o.notes || ''
     const priceMatch = notes.match(/Price:\s*([\d.]+)\s*(\w+)/)
     const price = priceMatch ? priceMatch[1] : '—'
@@ -198,7 +198,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
               <StageBadge stage={o.stage} />
               <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>
               <Btn size="sm" onClick={() => printSheet(o)}>Print sheet</Btn>
-              {o.source === 'eBay' && <Btn size="sm" onClick={() => printPackingSlip(o)}>Packing slip</Btn>}
+
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
