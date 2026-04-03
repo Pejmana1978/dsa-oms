@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import Modal from './Modal'
 import Btn from './Btn'
 import StageProgress from './StageProgress'
-import { STAGES, SEAT_OPTIONS } from '../lib/constants'
+import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
 import { useToast } from './Toast'
 
@@ -155,13 +155,38 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <Field label="Car (make / model / year)"><input value={form.car || ''} onChange={e => setF('car', e.target.value)} readOnly={!canEdit} /></Field>
             <Field label="VIN number"><input value={form.vin || ''} onChange={e => setF('vin', e.target.value)} style={{ fontFamily: 'monospace', fontSize: 11 }} readOnly={!canEdit} /></Field>
           </Row>
+          <Field label="Position (select all that apply)">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {POSITION_OPTIONS.map(p => (
+                <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
+                  <input type="checkbox" disabled={!canEdit}
+                    checked={(form.position || []).includes(p)}
+                    onChange={e => {
+                      const cur = form.position || []
+                      setF('position', e.target.checked ? [...cur, p] : cur.filter(x => x !== p))
+                    }} />
+                  {p}
+                </label>
+              ))}
+            </div>
+          </Field>
           <Row>
-            <Field label="Seats to cover">
-              <select value={form.seats || ''} onChange={e => setF('seats', e.target.value)} disabled={!canEdit}>
-                {SEAT_OPTIONS.map(s => <option key={s}>{s}</option>)}
+            <Field label="Material">
+              <select value={form.material || ''} onChange={e => setF('material', e.target.value)} disabled={!canEdit}>
+                <option value="">— select —</option>
+                {MATERIAL_OPTIONS.map(m => <option key={m}>{m}</option>)}
               </select>
             </Field>
-            <Field label="Color / material"><input value={form.color || ''} onChange={e => setF('color', e.target.value)} readOnly={!canEdit} /></Field>
+            <Field label="Color + trim code"><input value={form.color || ''} onChange={e => setF('color', e.target.value)} readOnly={!canEdit} placeholder="e.g. Black 040" /></Field>
+          </Row>
+          <Row>
+            <Field label="Quantity"><input type="number" min="1" value={form.quantity || 1} onChange={e => setF('quantity', parseInt(e.target.value))} readOnly={!canEdit} style={{ width: 80 }} /></Field>
+            <Field label="Ship from Sweden stock">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 4 }}>
+                <input type="checkbox" disabled={!canEdit} checked={form.ship_from_stock || false} onChange={e => setF('ship_from_stock', e.target.checked)} />
+                Use Sweden stock (skips production)
+              </label>
+            </Field>
           </Row>
           <Row>
             <Field label="Source">
@@ -260,8 +285,10 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               ['Address', order.address],
               ['Car', order.car],
               ['VIN', order.vin || '-'],
-              ['Seats', order.seats],
-              ['Color / material', order.color],
+              ['Position', (order.position || []).join(', ') || '-'],
+              ['Material', order.material || '-'],
+              ['Color / trim', order.color || '-'],
+              ['Quantity', order.quantity || 1],
               ['Notes', order.notes || '-'],
               ['Status', order.stage],
             ].map(([k, v]) => (
@@ -279,7 +306,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#888', minWidth: 60 }}>Phone</span><span>{order.phone}</span></div>
             <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#888', minWidth: 60 }}>Email</span><span>{order.email}</span></div>
             <div style={{ border: '1px solid #e0ddd8', borderRadius: 6, padding: 10, marginTop: 10, background: '#f5f5f4' }}>
-              <div style={{ fontWeight: 600 }}>{order.seats} seat covers - {order.color}</div>
+              <div style={{ fontWeight: 600 }}>{(order.position || []).join(', ')} — {order.material} — {order.color}</div>
               <div style={{ color: '#888', fontSize: 11 }}>{order.car}</div>
             </div>
             <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, textAlign: 'center', padding: '6px', border: '1px solid #e0ddd8', borderRadius: 4 }}>{order.order_ref}</div>

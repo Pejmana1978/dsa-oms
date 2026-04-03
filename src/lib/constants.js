@@ -1,36 +1,41 @@
 export const STAGES = [
   'New',
-  'Awaiting verification',
+  'Contacted',
   'Verified',
-  'In production',
-  'Production completed',
-  'Packed',
-  'Shipped'
+  'In Production',
+  'Production Complete',
+  'Shipped to Sweden',
+  'Shipped to Customer',
+  'Delivered'
 ]
 
 export const ROLE_PAGES = {
-  admin:      ['orders', 'production', 'shipping', 'stats', 'users'],
-  sales:      ['orders', 'stats'],
-  production: ['production'],
-  shipping:   ['shipping'],
+  admin:           ['orders', 'production', 'shipping', 'stock', 'stats', 'users'],
+  sales:           ['orders', 'stats'],
+  production:      ['production'],
+  shipping_us:     ['shipping_us'],
+  shipping_sweden: ['shipping_sweden'],
 }
 
 export const PAGE_LABELS = {
-  orders:     'All orders',
-  production: 'Production queue',
-  shipping:   'Shipping',
-  stats:      'Overview',
-  users:      'Users',
+  orders:          'All orders',
+  production:      'Production queue',
+  shipping_us:     'Shipping (USA)',
+  shipping_sweden: 'Shipping (Sweden)',
+  stock:           'Sweden stock',
+  stats:           'Overview',
+  users:           'Users',
 }
 
 export const BADGE_STYLES = {
-  'New':                    { background: '#E6F1FB', color: '#0C447C' },
-  'Awaiting verification':  { background: '#FAEEDA', color: '#633806' },
-  'Verified':               { background: '#EEEDFE', color: '#3C3489' },
-  'In production':          { background: '#FBEAF0', color: '#72243E' },
-  'Production completed':   { background: '#EAF3DE', color: '#27500A' },
-  'Packed':                 { background: '#E1F5EE', color: '#085041' },
-  'Shipped':                { background: '#F1EFE8', color: '#444441' },
+  'New':                  { background: '#E6F1FB', color: '#0C447C' },
+  'Contacted':            { background: '#FAEEDA', color: '#633806' },
+  'Verified':             { background: '#EEEDFE', color: '#3C3489' },
+  'In Production':        { background: '#FBEAF0', color: '#72243E' },
+  'Production Complete':  { background: '#EAF3DE', color: '#27500A' },
+  'Shipped to Sweden':    { background: '#E1F5EE', color: '#085041' },
+  'Shipped to Customer':  { background: '#D4EDDA', color: '#155724' },
+  'Delivered':            { background: '#F1EFE8', color: '#444441' },
 }
 
 export const SOURCE_STYLES = {
@@ -38,6 +43,24 @@ export const SOURCE_STYLES = {
   eBay:    { background: '#FAEEDA', color: '#854F0B' },
   Manual:  { background: '#F1EFE8', color: '#5F5E5A' },
 }
+
+export const POSITION_OPTIONS = [
+  'Driver Bottom',
+  'Driver Top',
+  'Passenger Bottom',
+  'Passenger Top',
+  'Other',
+]
+
+export const MATERIAL_OPTIONS = [
+  'Vinyl',
+  'Vinyl perf',
+  'Leather',
+  'Leather perf',
+  'Cloth',
+  'Vinyl & Alcantara',
+  'Other',
+]
 
 export const SEAT_OPTIONS = [
   'Full set (5)',
