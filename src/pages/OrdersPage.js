@@ -119,8 +119,8 @@ export default function OrdersPage({ orders, setOrders, role }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <thead>
             <tr style={{ background: '#f9f9f8' }}>
-              {['ID', 'Customer', 'Source', '', 'Product', 'Status', 'Date', 'Actions'].map((h, i) => (
-                <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [80, 130, 70, 48, 160, 95, 70, 110][i] }}>{h}</th>
+              {['ID', 'Customer', '', 'Product', 'Status', 'Actions'].map((h, i) => (
+                <th key={h} style={{ padding: '8px 11px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#888', borderBottom: '1px solid #e0ddd8', width: [110, 140, 48, 200, 95, 130][i] }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -132,19 +132,22 @@ export default function OrdersPage({ orders, setOrders, role }) {
               <tr key={o.id} onClick={() => setSelectedOrder(o)} style={{ cursor: 'pointer' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#fafaf9'}
                 onMouseLeave={e => e.currentTarget.style.background = ''}>
-                <td style={{ padding: '9px 11px', fontSize: 11, fontWeight: 600, color: '#185FA5' }}>{o.order_ref}</td>
+                <td style={{ padding: '9px 11px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#185FA5' }}>{o.order_ref}</div>
+                  <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>{o.order_date ? o.order_date.slice(0,10).split('-').reverse().join('/') : '—'}</div>
+                  <div style={{ marginTop: 3 }}><SourceBadge source={o.source} /></div>
+                </td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ fontSize: 12 }}>{o.customer_name}</div>
-                  <div style={{ fontSize: 10, color: '#aaa' }}>{o.phone}</div>
                 </td>
-                <td style={{ padding: '9px 11px' }}><SourceBadge source={o.source} /></td>
+
                 <td style={{ padding: '4px 6px' }}>{o.thumbnail ? <img src={o.thumbnail} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />}</td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ fontSize: 12 }}>{o.car}</div>
                   <div style={{ fontSize: 10, color: '#aaa' }}>{o.seats} · {o.color}</div>
                 </td>
                 <td style={{ padding: '9px 11px' }}><StageBadge stage={o.stage} /></td>
-                <td style={{ padding: '9px 11px', fontSize: 11, color: '#aaa' }}>{o.order_date ? o.order_date.slice(0, 10).split('-').reverse().join('/') : '—'}</td>
+
                 <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>
