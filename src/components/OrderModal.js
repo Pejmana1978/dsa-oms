@@ -111,6 +111,18 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     }
   }
 
+  async function handleThumbnailUpload(file) {
+    if (!file) return
+    try {
+      const { path, url } = await uploadPhoto(order.id, file)
+      setF('thumbnail', url)
+      await updateOrder(order.id, { thumbnail: url })
+      toast('Thumbnail updated')
+    } catch (err) {
+      toast(err.message, 'error')
+    }
+  }
+
   async function handleDeletePhoto(photo, idx) {
     try {
       if (photo.path) await deletePhoto(photo.path)
@@ -169,15 +181,27 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <StageProgress stage={form.stage} />
 
-          {order.thumbnail && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#f9f9f8', borderRadius: 8, padding: 10, border: '1px solid #e0ddd8' }}>
-              <img src={order.thumbnail} alt="Product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} onError={e => { e.target.style.display = 'none' }} />
-              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>{order.car}</div>
-                <div style={{ color: '#888' }}>{order.notes}</div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#f9f9f8', borderRadius: 8, padding: 10, border: '1px solid #e0ddd8' }}>
+            <div
+              onDragOver={e => { e.preventDefault(); e.currentTarget.style.opacity = '0.7' }}
+              onDragLeave={e => { e.currentTarget.style.opacity = '1' }}
+              onDrop={e => { e.preventDefault(); e.currentTarget.style.opacity = '1'; const file = e.dataTransfer.files[0]; if (file) handleThumbnailUpload(file) }}
+              onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = e => handleThumbnailUpload(e.target.files[0]); input.click() }}
+              style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px dashed #ccc' }}>
+              {form.thumbnail
+                ? <img src={form.thumbnail} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#aaa', textAlign: 'center', padding: 4 }}>Drop image here</div>}
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: '0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
+                <span style={{ color: '#fff', fontSize: 10 }}>Replace</span>
               </div>
             </div>
-          )}
+            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{order.car}</div>
+              <div style={{ color: '#888' }}>{order.notes}</div>
+            </div>
+          </div>
 
           <Row>
             <Field label="Customer name"><input value={form.customer_name || ''} onChange={e => setF('customer_name', e.target.value)} readOnly={!canEdit} /></Field>
