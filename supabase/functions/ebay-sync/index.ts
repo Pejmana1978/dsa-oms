@@ -110,7 +110,6 @@ serve(async () => {
         contactAddr.countryCode,
       ].filter(Boolean).join(", ")
       const legacyItemId = item.legacyItemId || ""
-      console.log('ORDER:', order.orderId, 'legacyItemId:', legacyItemId, 'sku:', item.sku, 'itemKeys:', Object.keys(item).join(','))
       const sku = item.sku || legacyItemId || ""
       const thumbnail = legacyItemId ? await getThumbnail(legacyItemId, sku) : ""
       const price = item.lineItemCost?.value ? `${item.lineItemCost.value} ${item.lineItemCost.currency}` : ""
