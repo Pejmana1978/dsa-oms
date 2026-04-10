@@ -256,7 +256,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
                   }).map((p, i) => {
                     const imgs = o.photos.filter(p => ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()) && p.url)
                     return (
-                      <img key={i} src={p.url} alt="" onClick={() => { setLightbox({ photos: imgs, idx: i }); setShowLightbox(true) }} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8', cursor: 'zoom-in' }} />
+                      <img key={i} src={p.url} alt="" onClick={e => { e.stopPropagation(); setLightbox({ photos: imgs, idx: i }); setShowLightbox(true) }} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8', cursor: 'zoom-in' }} />
                     )
                   })}
                 </div>
