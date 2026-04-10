@@ -132,6 +132,7 @@ serve(async () => {
         stage: "New",
         notes: notes,
         thumbnail: thumbnail,
+        ebay_item_id: legacyItemId,
         order_date: order.creationDate ? order.creationDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
         photos: [],
       })

@@ -144,7 +144,8 @@ export default function OrdersPage({ orders, setOrders, role }) {
                 <td style={{ padding: '4px 6px' }}>{o.thumbnail ? <img src={o.thumbnail} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />}</td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ fontSize: 12 }}>{o.car}</div>
-                  <div style={{ fontSize: 10, color: '#aaa' }}>{o.seats} · {o.color}</div>
+                  <div style={{ fontSize: 10, color: '#aaa' }}>{o.color}</div>
+                  {o.ebay_item_id && <a href={'https://www.ebay.co.uk/itm/' + o.ebay_item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
                 </td>
                 <td style={{ padding: '9px 11px' }}><StageBadge stage={o.stage} /></td>
 
