@@ -21,7 +21,23 @@ async function getEbayToken() {
   return data.access_token
 }
 
-async function getThumbnail(token: string, itemId: string, sku: string): Promise<string> {
+async function getAppToken(): Promise<string> {
+  const credentials = btoa(`${EBAY_CLIENT_ID}:${EBAY_CLIENT_SECRET}`)
+  const res = await fetch("https://api.ebay.com/identity/v1/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope",
+  })
+  const data = await res.json()
+  return data.access_token || ""
+}
+
+async function getThumbnail(itemId: string, sku: string): Promise<string> {
+  const appToken = await getAppToken()
+  if (!appToken) return ""
   const variationId = sku ? sku.split("_")[1] || "0" : "0"
   const urls = [
     `https://api.ebay.com/buy/browse/v1/item/v1|${itemId}|${variationId}?fieldgroups=PRODUCT`,
@@ -31,7 +47,7 @@ async function getThumbnail(token: string, itemId: string, sku: string): Promise
     try {
       const res = await fetch(url, {
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "Authorization": `Bearer ${appToken}`,
           "X-EBAY-C-MARKETPLACE-ID": "EBAY_GB",
         },
       })
@@ -94,8 +110,9 @@ serve(async () => {
         contactAddr.countryCode,
       ].filter(Boolean).join(", ")
       const legacyItemId = item.legacyItemId || ""
+      console.log('ORDER:', order.orderId, 'legacyItemId:', legacyItemId, 'sku:', item.sku, 'itemKeys:', Object.keys(item).join(','))
       const sku = item.sku || legacyItemId || ""
-      const thumbnail = legacyItemId ? await getThumbnail(token, legacyItemId, sku) : ""
+      const thumbnail = legacyItemId ? await getThumbnail(legacyItemId, sku) : ""
       const price = item.lineItemCost?.value ? `${item.lineItemCost.value} ${item.lineItemCost.currency}` : ""
       const buyerUsername = buyer.username || ""
       const notes = [
