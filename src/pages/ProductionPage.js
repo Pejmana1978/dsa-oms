@@ -269,6 +269,15 @@ export default function ProductionPage({ orders, setOrders, role }) {
       {selected && (
         <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />
       )}
+      {showLightbox && lightbox.photos[lightbox.idx] && (
+        <div onClick={() => setShowLightbox(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }}>
+          <div style={{ position: 'absolute', top: 20, right: 24, color: '#fff', fontSize: 28, cursor: 'pointer' }}>✕</div>
+          {lightbox.idx > 0 && <div onClick={e => { e.stopPropagation(); setLightbox(prev => ({ ...prev, idx: prev.idx - 1 })) }} style={{ position: 'absolute', left: 24, color: '#fff', fontSize: 48, cursor: 'pointer', userSelect: 'none' }}>‹</div>}
+          <img src={lightbox.photos[lightbox.idx].url} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 8 }} onClick={e => e.stopPropagation()} />
+          {lightbox.idx < lightbox.photos.length - 1 && <div onClick={e => { e.stopPropagation(); setLightbox(prev => ({ ...prev, idx: prev.idx + 1 })) }} style={{ position: 'absolute', right: 24, color: '#fff', fontSize: 48, cursor: 'pointer', userSelect: 'none' }}>›</div>}
+          <div style={{ position: 'absolute', bottom: 20, color: '#aaa', fontSize: 12 }}>{lightbox.idx + 1} / {lightbox.photos.length}</div>
+        </div>
+      )}
     </>
   )
 }
