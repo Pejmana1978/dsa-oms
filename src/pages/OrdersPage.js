@@ -99,7 +99,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
           {['Shopify', 'eBay', 'Manual'].map(s => <option key={s}>{s}</option>)}
         </select>
         {canCreate && <Btn variant="primary" onClick={() => setShowNew(true)}>+ New order</Btn>}
-{canCreate && <Btn variant="default" onClick={syncEbay} disabled={syncing}>{syncing ? 'Syncing eBay…' : 'Sync eBay orders'}</Btn>}
+{canCreate && <Btn variant="default" onClick={syncEbay} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync orders'}</Btn>}
       </div>
 
       {/* Stage tabs */}

@@ -249,6 +249,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
                 </label>
               ))}
             </div>
+            {(form.position || []).includes('Other') && (
+              <input value={form.position_other || ''} onChange={e => setF('position_other', e.target.value)} readOnly={!canEdit} placeholder="Describe other position..." style={{ marginTop: 6, width: '100%' }} />
+            )}
           </Field>
           <Row>
             <Field label="Material">
