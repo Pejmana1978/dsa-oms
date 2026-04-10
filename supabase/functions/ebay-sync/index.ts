@@ -100,7 +100,9 @@ serve(async () => {
       const fulfillment = order.fulfillmentStartInstructions?.[0] || {}
       const shipTo = fulfillment.shippingStep?.shipTo || {}
       const contactAddr = shipTo.contactAddress || {}
-      const phone = formatPhone(shipTo.primaryPhone?.phoneNumber || "")
+      const phone1 = shipTo.primaryPhone?.phoneNumber?.trim() || ""
+      const phone2 = shipTo.backupPhone?.phoneNumber?.trim() || ""
+      const phone = [phone1, phone2].filter(Boolean).join(" / ")
       const address = [
         contactAddr.addressLine1,
         contactAddr.addressLine2,
@@ -122,7 +124,7 @@ serve(async () => {
       const { error } = await supabase.from("orders").insert({
         order_ref: ref,
         customer_name: shipTo.fullName || buyerUsername || "eBay Customer",
-        email: "",
+        email: buyer.email || shipTo.email || "",
         phone: phone,
         address: address,
         car: item.title || "See eBay order",

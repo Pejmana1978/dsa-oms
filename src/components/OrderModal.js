@@ -197,9 +197,11 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
                 <span style={{ color: '#fff', fontSize: 10 }}>Replace</span>
               </div>
             </div>
-            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{order.car}</div>
-              <div style={{ color: '#888' }}>{order.notes}</div>
+              <div style={{ color: '#888', fontSize: 11 }}>{order.notes}</div>
+              {order.tracking_number && <div style={{ marginTop: 4 }}><a href={'https://www.ups.com/track?tracknum=' + order.tracking_number} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>📦 {order.tracking_number}</a></div>}
+              {order.ebay_item_id && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/itm/' + order.ebay_item_id} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay listing →</a></div>}
             </div>
           </div>
 
@@ -267,6 +269,18 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               </div>
             </Field>
           </Row>
+          <SectionLabel>Customer and shipping</SectionLabel>
+          <Row>
+            <Field label="Customer name"><input value={form.customer_name || ''} onChange={e => setF('customer_name', e.target.value)} readOnly={!canEdit} /></Field>
+            <Field label="Phone"><input value={form.phone || ''} onChange={e => setF('phone', e.target.value)} readOnly={!canEdit} placeholder="As provided by eBay" /></Field>
+          </Row>
+          <Row>
+            <Field label="Email"><input value={form.email || ''} onChange={e => setF('email', e.target.value)} readOnly={!canEdit} /></Field>
+            <Field label="Tracking number"><input value={form.tracking_number || ''} onChange={e => setF('tracking_number', e.target.value)} readOnly={!canEdit} placeholder="e.g. 1Z6V1294..." /></Field>
+          </Row>
+          <Field label="Shipping address">
+            <textarea value={form.address || ''} onChange={e => setF('address', e.target.value)} readOnly={!canEdit} style={{ minHeight: 60 }} placeholder="Street, city, postcode, country" />
+          </Field>
           <Row>
             <Field label="Source">
               <select value={form.source || ''} onChange={e => setF('source', e.target.value)} disabled={!canEdit}>
