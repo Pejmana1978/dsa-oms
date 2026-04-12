@@ -266,6 +266,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, flex: 1 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{order.car}</div>
               <div style={{ color: '#888', fontSize: 11 }}>{order.notes}</div>
+              {order.sale_amount && <div style={{ marginTop: 4, fontSize: 11, color: '#555' }}>💰 {order.sale_currency} {order.sale_amount}{order.refund_amount > 0 ? <span style={{ color: '#E24B4A', marginLeft: 8 }}>− {order.sale_currency} {order.refund_amount} refund</span> : ''}</div>}
               {order.tracking_number && <div style={{ marginTop: 4 }}><a href={'https://www.ups.com/track?tracknum=' + order.tracking_number} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>📦 {order.tracking_number}</a></div>}
               {order.ebay_item_id && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/itm/' + order.ebay_item_id} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay listing →</a></div>}
               {order.source === 'eBay' && order.order_ref && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + order.order_ref} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay order →</a></div>}
