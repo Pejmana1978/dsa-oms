@@ -131,12 +131,49 @@ serve(async () => {
         notes: notes,
         thumbnail: thumbnail,
         ebay_item_id: legacyItemId,
+        sale_amount: item.lineItemCost?.value ? parseFloat(item.lineItemCost.value) : null,
+        sale_currency: item.lineItemCost?.currency || null,
         order_date: order.creationDate ? order.creationDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
         photos: [],
       })
       if (!error) imported++
     }
-    return new Response(JSON.stringify({ success: true, imported, total: ebayOrders.length }), {
+    // Check existing eBay orders for cancellations and refunds
+    const { data: existingOrders } = await supabase
+      .from("orders")
+      .select("id, order_ref, archived, refund_amount")
+      .eq("source", "eBay")
+      .eq("archived", false)
+
+    let cancelled = 0
+    let refunded = 0
+
+    for (const ebayOrder of ebayOrders) {
+      const ref = ebayOrder.orderId
+      const existing = existingOrders?.find(o => o.order_ref === ref)
+      if (!existing) continue
+
+      // Check for cancellation
+      if (ebayOrder.orderFulfillmentStatus === 'NOT_STARTED' && ebayOrder.cancelStatus?.cancelState === 'CANCEL_COMPLETE') {
+        await supabase.from("orders").update({ archived: true, refund_note: 'Cancelled on eBay' }).eq("id", existing.id)
+        cancelled++
+        continue
+      }
+
+      // Check for refunds
+      const refundAmount = ebayOrder.paymentSummary?.refunds?.reduce((sum: number, r: any) => sum + parseFloat(r.amount?.value || 0), 0) || 0
+      if (refundAmount > 0 && refundAmount !== existing.refund_amount) {
+        const refundDate = ebayOrder.paymentSummary?.refunds?.[0]?.refundDate?.slice(0, 10) || new Date().toISOString().slice(0, 10)
+        await supabase.from("orders").update({
+          refund_amount: refundAmount,
+          refund_date: refundDate,
+          refund_note: ebayOrder.paymentSummary?.refunds?.[0]?.refundType || 'Refund'
+        }).eq("id", existing.id)
+        refunded++
+      }
+    }
+
+    return new Response(JSON.stringify({ success: true, imported, cancelled, refunded, total: ebayOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {
