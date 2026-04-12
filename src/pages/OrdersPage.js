@@ -29,8 +29,9 @@ export default function OrdersPage({ orders, setOrders, role }) {
 }
 
   const stageCounts = useMemo(() => {
-    const c = { All: orders.length }
-    STAGES.forEach(s => { c[s] = orders.filter(o => o.stage === s).length })
+    const active = orders.filter(o => !o.archived)
+    const c = { All: active.length }
+    STAGES.forEach(s => { c[s] = active.filter(o => o.stage === s).length })
     return c
   }, [orders])
 
