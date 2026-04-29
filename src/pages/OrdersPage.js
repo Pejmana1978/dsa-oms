@@ -97,7 +97,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
         <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name, order ID, VIN, car…" style={{ flex: 1, minWidth: 160 }} />
         <select value={srcFilter} onChange={e => setSrcFilter(e.target.value)} style={{ width: 'auto' }}>
           <option value="">All sources</option>
-          {['Shopify', 'eBay', 'Manual'].map(s => <option key={s}>{s}</option>)}
+          {['Website', 'eBay', 'Manual'].map(s => <option key={s}>{s}</option>)}
         </select>
         {canCreate && <Btn variant="primary" onClick={() => setShowNew(true)}>+ New order</Btn>}
 {canCreate && <Btn variant="default" onClick={syncEbay} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync orders'}</Btn>}

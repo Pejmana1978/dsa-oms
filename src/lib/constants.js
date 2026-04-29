@@ -40,7 +40,7 @@ export const BADGE_STYLES = {
 }
 
 export const SOURCE_STYLES = {
-  Shopify: { background: '#EAF3DE', color: '#3B6D11' },
+  Website: { background: '#EAF3DE', color: '#3B6D11' },
   eBay:    { background: '#FAEEDA', color: '#854F0B' },
   Manual:  { background: '#F1EFE8', color: '#5F5E5A' },
 }

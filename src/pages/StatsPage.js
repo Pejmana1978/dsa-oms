@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { STAGES } from '../lib/constants'
 
 const STAGE_COLORS = ['#B5D4F4','#FAC775','#CECBF6','#F4C0D1','#C0DD97','#9FE1CB','#D3D1C7']
-const SRC_COLORS = { Shopify: '#C0DD97', eBay: '#FAC775', Manual: '#D3D1C7' }
+const SRC_COLORS = { Website: '#C0DD97', eBay: '#FAC775', Manual: '#D3D1C7' }
 
 function StatCard({ label, value, color }) {
   return (
@@ -36,7 +36,7 @@ export default function StatsPage({ orders }) {
     const inProd = orders.filter(o => ['Verified', 'In production'].includes(o.stage)).length
     const shipped = orders.filter(o => o.stage === 'Shipped').length
     const stageData = STAGES.map((s, i) => ({ label: s, value: orders.filter(o => o.stage === s).length, color: STAGE_COLORS[i] }))
-    const sourceData = ['Shopify', 'eBay', 'Manual'].map(s => ({ label: s, value: orders.filter(o => o.source === s).length, color: SRC_COLORS[s] }))
+    const sourceData = ['Website', 'eBay', 'Manual'].map(s => ({ label: s, value: orders.filter(o => o.source === s).length, color: SRC_COLORS[s] }))
     return { total, pending, inProd, shipped, stageData, sourceData }
   }, [orders])
 

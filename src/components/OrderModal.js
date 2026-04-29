@@ -427,7 +427,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           <Row>
             <Field label="Source">
               <select value={form.source || ''} onChange={e => setF('source', e.target.value)} disabled={!canEdit}>
-                {['Shopify', 'eBay', 'Manual'].map(s => <option key={s}>{s}</option>)}
+                {['Website', 'eBay', 'Manual'].map(s => <option key={s}>{s}</option>)}
               </select>
             </Field>
             <Field label="Order date"><input type="date" value={form.order_date || ''} onChange={e => setF('order_date', e.target.value)} readOnly={!canEdit} /></Field>
