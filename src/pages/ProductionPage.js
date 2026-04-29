@@ -41,37 +41,11 @@ export default function ProductionPage({ orders, setOrders, role }) {
   function buildSheetHTML(o) {
     const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
     const positions = (o.position || []).join(' & ') || '—'
-    const vinYear = [o.vin ? `VIN: ${o.vin}` : ''].filter(Boolean).join(' ')
-    return `
-      <div class="sheet">
-        <div class="header">
-          <div class="header-left">
-            <div class="order-date">Order ${new Date().toISOString().slice(0,10)}</div>
-            <div class="car">${o.car}</div>
-            <div class="order-ref">Order: ${o.order_ref}</div>
-          </div>
-        </div>
-        <div class="main-row">
-          <div class="col-photo">
-            ${customerPhotos.length > 0 ? `<img src="${customerPhotos[0].url}" class="customer-photo" />` : '<div class="no-photo">No photo</div>'}
-          </div>
-          <div class="col-details">
-            <div class="position ${(o.position||[]).length > 1 ? 'highlight' : ''}">${positions}</div>
-            <div class="material">${o.material || '—'}</div>
-            <div class="color">${o.color || '—'}</div>
-            ${o.notes ? `<div class="notes">${o.notes}</div>` : ''}
-          </div>
-          <div class="col-qty">
-            <div class="qty">${o.quantity || 1}</div>
-          </div>
-          <div class="col-right">
-            ${o.thumbnail ? `<img src="${o.thumbnail}" class="thumb" />` : ''}
-            <div class="vin">${vinYear}</div>
-          </div>
-        </div>
-
-      </div>`
+    const vinText = o.vin ? 'VIN: ' + o.vin : ''
+    const allPhotosHtml = customerPhotos.map(p => '<img src="' + p.url + '" style="height:140px;max-width:200px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;margin-right:6px" />').join('')
+    return '<div class="sheet"><div class="header"><div class="order-date">Order ' + new Date().toISOString().slice(0,10) + '</div><div class="car">' + o.car + '</div><div class="order-ref">Order: ' + o.order_ref + '</div></div><div class="main-row"><div class="col-photos">' + (allPhotosHtml || '<div class="no-photo">No photo</div>') + '</div><div class="col-details"><div class="position ' + ((o.position||[]).length > 1 ? 'highlight' : '') + '">' + positions + '</div><div class="material">' + (o.material || '—') + '</div><div class="color">' + (o.color || '—') + '</div>' + (o.notes ? '<div class="notes">' + o.notes + '</div>' : '') + '</div><div class="col-qty"><div class="qty">' + (o.quantity || 1) + '</div></div><div class="col-right">' + (o.thumbnail ? '<img src="' + o.thumbnail + '" style="height:100px;max-width:120px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block;margin-bottom:6px" />' : '') + '<div class="vin">' + vinText + '</div></div></div></div>'
   }
+
 
   function printSheet(o) {
     const w = window.open('', '_blank')
@@ -85,7 +59,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
         .order-date { font-size: 11px; color: #666; }
         .car { font-size: 16px; font-weight: bold; margin: 2px 0; }
         .order-ref { font-size: 11px; color: #555; }
-        .main-row { display: grid; grid-template-columns: 200px 1fr 80px 160px; gap: 16px; align-items: start; margin: 12px 0; }
+        .main-row { display: grid; grid-template-columns: auto 1fr 80px 140px; gap: 12px; align-items: start; margin: 10px 0; }
         .customer-photo { width: 180px; height: 160px; object-fit: contain; border-radius: 6px; border: 1px solid #ddd; background: #f9f9f9; }
         .no-photo { width: 180px; height: 160px; background: #f5f5f5; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; }
         .position { font-size: 15px; font-weight: bold; margin-bottom: 6px; }
@@ -208,7 +182,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
     if (!prod.length) { toast('No production orders'); return }
     const w = window.open('', '_blank')
     const sheetsHTML = prod.map(o => buildSheetHTML(o)).join('')
-    w.document.write('<html><head><title>All Production Sheets</title><style>* { box-sizing: border-box; } body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; color: #000; } .sheet { border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; page-break-after: always; } .header { margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 8px; } .order-date { font-size: 11px; color: #666; } .car { font-size: 16px; font-weight: bold; margin: 2px 0; } .order-ref { font-size: 11px; color: #555; } .main-row { display: grid; grid-template-columns: 200px 1fr 80px 160px; gap: 16px; align-items: start; margin: 12px 0; } .customer-photo { width: 180px; height: 160px; object-fit: contain; border-radius: 6px; border: 1px solid #ddd; background: #f9f9f9; } .no-photo { width: 180px; height: 160px; background: #f5f5f5; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; } .position { font-size: 15px; font-weight: bold; margin-bottom: 6px; } .position.highlight { color: #d97706; } .material { font-size: 13px; margin-bottom: 4px; } .color { font-size: 13px; color: #333; margin-bottom: 4px; } .notes { font-size: 11px; background: #FFFBEB; border: 1px solid #F59E0B; border-radius: 4px; padding: 4px 8px; margin-top: 8px; } .qty { font-size: 48px; font-weight: bold; text-align: center; line-height: 1; padding-top: 20px; } .thumb { width: 120px; height: 100px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 8px; } .vin { font-size: 10px; color: #555; font-family: monospace; } .comment-box { border-top: 1px solid #ddd; padding-top: 10px; margin-top: 8px; } .comment-label { font-size: 11px; color: #888; margin-bottom: 6px; } .comment-lines { border: 1px solid #ddd; border-radius: 4px; height: 50px; } @media print { button { display: none } .sheet { page-break-after: always; } }</style></head><body>' + sheetsHTML + '<button onclick="window.print()">Print all</button></body></html>')
+    w.document.write('<html><head><title>All Production Sheets</title><style>* { box-sizing: border-box; } body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; color: #000; } .sheet { border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; page-break-after: always; } .header { margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 8px; } .order-date { font-size: 11px; color: #666; } .car { font-size: 16px; font-weight: bold; margin: 2px 0; } .order-ref { font-size: 11px; color: #555; } .main-row { display: grid; grid-template-columns: auto 1fr 80px 140px; gap: 12px; align-items: start; margin: 10px 0; } .no-photo { width: 160px; height: 140px; background: #f5f5f5; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; } .position { font-size: 15px; font-weight: bold; margin-bottom: 4px; } .position.highlight { color: #d97706; } .material { font-size: 13px; margin-bottom: 3px; } .color { font-size: 13px; color: #333; margin-bottom: 3px; } .notes { font-size: 11px; background: #FFFBEB; border: 1px solid #F59E0B; border-radius: 4px; padding: 4px 8px; margin-top: 6px; } .qty { font-size: 48px; font-weight: bold; text-align: center; line-height: 1; padding-top: 10px; } .vin { font-size: 10px; color: #555; font-family: monospace; } @media print { button { display: none } .sheet { page-break-after: always; } }</style></head><body>' + sheetsHTML + '<button onclick="window.print()">Print all</button></body></html>')
     w.document.close()
   }
 
