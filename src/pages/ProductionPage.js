@@ -210,26 +210,8 @@ export default function ProductionPage({ orders, setOrders, role }) {
   function printAll() {
     if (!prod.length) { toast('No production orders'); return }
     const w = window.open('', '_blank')
-    w.document.write(`<html><head><title>All Production Sheets</title>
-      <style>body{font-family:sans-serif;padding:32px;font-size:13px;line-height:2}.sheet{page-break-after:always;margin-bottom:40px}h2{margin-bottom:12px}td:first-child{color:#888;min-width:140px;padding-right:16px}table{border-collapse:collapse}@media print{button{display:none}}</style>
-      </head><body>
-      ${prod.map(o => `<div class="sheet">
-        <h2>Production Sheet — ${o.order_ref}</h2>
-        <table>
-          <tr><td>Order ID</td><td>${o.order_ref}</td></tr>
-          <tr><td>Car</td><td><strong>${o.car}</strong></td></tr>
-          <tr><td>VIN</td><td style="font-family:monospace"><strong>${o.vin || '—'}</strong></td></tr>
-          <tr><td>Position</td><td><strong>${(o.position || []).join(', ') || '—'}</strong></td></tr>
-          <tr><td>Material</td><td><strong>${o.material || '—'}</strong></td></tr>
-          <tr><td>Color / Trim</td><td><strong>${o.color || '—'}</strong></td></tr>
-          <tr><td>Quantity</td><td><strong>${o.quantity || 1}</strong></td></tr>
-          <tr><td>Notes</td><td>${o.notes || '—'}</td></tr>
-          <tr><td>Status</td><td>${o.stage}</td></tr>
-        </table>
-        <div style="margin-top:12px"><div style="color:#888;font-size:11px;margin-bottom:6px">Photos</div><div style="display:flex;gap:8px;flex-wrap:wrap">${o.thumbnail ? `<img src="${o.thumbnail}" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:1px solid #e0ddd8"/>` : ''}${(o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase())).map(p => `<img src="${p.url}" style="width:120px;height:120px;object-fit:cover;border-radius:6px;border:1px solid #e0ddd8"/>`).join('')}</div></div>
-      </div>`).join('')}
-      <button onclick="window.print()">Print all</button>
-      </body></html>`)
+    const sheetsHTML = prod.map(o => buildSheetHTML(o)).join('')
+    w.document.write('<html><head><title>All Production Sheets</title><style>* { box-sizing: border-box; } body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; color: #000; } .sheet { border: 1px solid #ccc; border-radius: 6px; padding: 16px; margin-bottom: 24px; page-break-after: always; } .header { margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 8px; } .order-date { font-size: 11px; color: #666; } .car { font-size: 16px; font-weight: bold; margin: 2px 0; } .order-ref { font-size: 11px; color: #555; } .main-row { display: grid; grid-template-columns: 200px 1fr 80px 160px; gap: 16px; align-items: start; margin: 12px 0; } .customer-photo { width: 180px; height: 160px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; } .no-photo { width: 180px; height: 160px; background: #f5f5f5; border: 1px dashed #ccc; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; } .position { font-size: 15px; font-weight: bold; margin-bottom: 6px; } .position.highlight { color: #d97706; } .material { font-size: 13px; margin-bottom: 4px; } .color { font-size: 13px; color: #333; margin-bottom: 4px; } .notes { font-size: 11px; background: #FFFBEB; border: 1px solid #F59E0B; border-radius: 4px; padding: 4px 8px; margin-top: 8px; } .qty { font-size: 48px; font-weight: bold; text-align: center; line-height: 1; padding-top: 20px; } .thumb { width: 120px; height: 100px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 8px; } .vin { font-size: 10px; color: #555; font-family: monospace; } .comment-box { border-top: 1px solid #ddd; padding-top: 10px; margin-top: 8px; } .comment-label { font-size: 11px; color: #888; margin-bottom: 6px; } .comment-lines { border: 1px solid #ddd; border-radius: 4px; height: 50px; } @media print { button { display: none } .sheet { page-break-after: always; } }</style></head><body>' + sheetsHTML + '<button onclick="window.print()">Print all</button></body></html>')
     w.document.close()
   }
 
