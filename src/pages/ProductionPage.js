@@ -42,8 +42,8 @@ export default function ProductionPage({ orders, setOrders, role }) {
     const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
     const positions = (o.position || []).join(' & ') || '—'
     const isMultiPos = (o.position||[]).length > 1
-    const photosRow = customerPhotos.length > 0 ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' + customerPhotos.map(p => '<img src="' + p.url + '" style="height:160px;max-width:220px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" />').join('') + '</div>' : ''
-    const thumbImg = o.thumbnail ? '<img src="' + o.thumbnail + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />' : ''
+    const photosRow = customerPhotos.length > 0 ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' + customerPhotos.map(p => '<img src="' + p.url + '" style="height:120px;max-width:160px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" loading="lazy"  />').join('') + '</div>' : ''
+    const thumbImg = o.thumbnail ? '<img src="' + o.thumbnail.replace('s-l1600', 's-l500') + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />' : ''
     const notesHtml = o.notes ? '<div style="font-size:11px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:3px 7px;margin-top:6px;display:inline-block">' + o.notes + '</div>' : ''
     const lastCol = (o.vin ? '<div style="font-size:10px;font-family:monospace;color:#555;margin-bottom:4px">VIN: ' + o.vin + '</div>' : '') +
       (o.year ? '<div style="font-size:11px;color:#555;margin-bottom:6px">Year: ' + o.year + '</div>' : '') +

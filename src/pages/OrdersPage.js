@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { StageBadge, SourceBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { STAGES } from '../lib/constants'
@@ -15,6 +15,12 @@ export default function OrdersPage({ orders, setOrders, role }) {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [syncing, setSyncing] = useState(false)
+
+  useEffect(() => {
+    function handleFilter(e) { setStageFilter(e.detail) }
+    window.addEventListener('filterStage', handleFilter)
+    return () => window.removeEventListener('filterStage', handleFilter)
+  }, [])
   const toast = useToast()
   async function syncEbay() {
   setSyncing(true)
