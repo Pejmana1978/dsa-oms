@@ -41,9 +41,20 @@ export default function ProductionPage({ orders, setOrders, role }) {
   function buildSheetHTML(o) {
     const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
     const positions = (o.position || []).join(' & ') || '—'
-    const vinText = o.vin ? 'VIN: ' + o.vin : ''
-    const allPhotosHtml = customerPhotos.map(p => '<img src="' + p.url + '" style="height:140px;max-width:200px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;margin-right:6px" />').join('')
-    return '<div class="sheet"><div class="header"><div class="order-date">Order ' + new Date().toISOString().slice(0,10) + '</div><div class="car">' + o.car + '</div><div class="order-ref">Order: ' + o.order_ref + '</div></div><div class="main-row"><div class="col-photos">' + (allPhotosHtml || '<div class="no-photo">No photo</div>') + '</div><div class="col-details"><div class="position ' + ((o.position||[]).length > 1 ? 'highlight' : '') + '">' + positions + '</div><div class="material">' + (o.material || '—') + '</div><div class="color">' + (o.color || '—') + '</div>' + (o.notes ? '<div class="notes">' + o.notes + '</div>' : '') + '</div><div class="col-qty"><div class="qty">' + (o.quantity || 1) + '</div></div><div class="col-right">' + (o.thumbnail ? '<img src="' + o.thumbnail + '" style="height:100px;max-width:120px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block;margin-bottom:6px" />' : '') + '<div class="vin">' + vinText + '</div></div></div></div>'
+    const isMultiPos = (o.position||[]).length > 1
+    const photosRow = customerPhotos.length > 0 ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' + customerPhotos.map(p => '<img src="' + p.url + '" style="height:160px;max-width:220px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" />').join('') + '</div>' : ''
+    const thumbImg = o.thumbnail ? '<img src="' + o.thumbnail + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />' : ''
+    const notesHtml = o.notes ? '<div style="font-size:11px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:3px 7px;margin-top:6px;display:inline-block">' + o.notes + '</div>' : ''
+    return '<div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:16px;page-break-inside:avoid">' +
+      '<table style="width:100%;border-collapse:collapse"><tr>' +
+      '<td style="width:22%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;line-height:1.3">' + o.car + '</div><div style="font-size:11px;color:#666;margin-top:3px">Order: ' + o.order_ref + '</div></td>' +
+      '<td style="width:28%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;color:' + (isMultiPos ? '#d97706' : '#000') + '">' + positions + '</div><div style="font-size:13px;margin-top:3px">' + (o.material || '—') + '</div><div style="font-size:13px;color:#333">' + (o.color || '—') + '</div>' + notesHtml + '</td>' +
+      '<td style="width:8%;vertical-align:top;text-align:center"><div style="font-size:48px;font-weight:bold;line-height:1">' + (o.quantity || 1) + '</div></td>' +
+      '<td style="width:16%;vertical-align:top;padding:0 10px">' + thumbImg + '</td>' +
+      '<td style="width:26%;vertical-align:top;font-size:10px;font-family:monospace;color:#555">' + (o.vin ? '<div>VIN: ' + o.vin + '</div>' : '') + '</td>' +
+      '</tr></table>' +
+      photosRow +
+      '</div>'
   }
 
 
