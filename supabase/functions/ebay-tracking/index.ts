@@ -20,8 +20,20 @@ async function getToken() {
 
 serve(async (req) => {
   try {
-    const { orderId, trackingNumber, lineItemId } = await req.json()
+    const { orderId, trackingNumber } = await req.json()
     const token = await getToken()
+
+    // First fetch the order to get the lineItemId
+    const orderRes = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order/${orderId}`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+    const orderData = await orderRes.json()
+    const lineItemId = orderData.lineItems?.[0]?.lineItemId
+
+    if (!lineItemId) {
+      return new Response(JSON.stringify({ error: "Could not find lineItemId for order" }), { status: 400 })
+    }
+
     const res = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order/${orderId}/shipping_fulfillment`, {
       method: "POST",
       headers: {
@@ -29,7 +41,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        lineItems: [{ lineItemId: lineItemId || "ALL" }],
+        lineItems: [{ lineItemId: lineItemId }],
         shippingCarrierCode: "UPS",
         trackingNumber: trackingNumber,
         shippedDate: new Date().toISOString(),
