@@ -54,10 +54,11 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  const pendingCount = orders.filter(o => ['New', 'Contacted'].includes(o.stage)).length
-  const prodCount = orders.filter(o => ['Verified', 'In Production'].includes(o.stage)).length
-  const shipUSCount = orders.filter(o => o.stage === 'Production Complete').length
-  const shipSwedCount = orders.filter(o => o.stage === 'Shipped to Sweden').length
+  const active = orders.filter(o => !o.archived)
+  const pendingCount = active.filter(o => ['New', 'Contacted'].includes(o.stage)).length
+  const prodCount = active.filter(o => ['Verified', 'In Production'].includes(o.stage)).length
+  const shipUSCount = active.filter(o => o.stage === 'Production Complete').length
+  const shipSwedCount = active.filter(o => o.stage === 'Shipped to Sweden').length
 
   function getBadge(p) {
     if (p === 'orders' && pendingCount > 0) return pendingCount
