@@ -26,11 +26,11 @@ export default function NewOrderModal({ onClose, onCreated }) {
   const toast = useToast()
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    customer_name: '', phone: '', email: '', address: '',
-    car: '', vin: '', position: [], position_other: '',
+    order_ref: '', customer_name: '', phone: '', email: '', address: '',
+    car: '', vin: '', year: '', position: [], position_other: '',
     material: '', color: '', quantity: 1,
     source: 'Website', order_date: new Date().toISOString().slice(0, 10),
-    notes: '', stage: 'New', photos: []
+    notes: '', stage: 'New', photos: [], tracking_number: ''
   })
 
   function setF(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
@@ -39,7 +39,7 @@ export default function NewOrderModal({ onClose, onCreated }) {
     if (!form.customer_name || !form.car) { toast('Customer name and car are required', 'error'); return }
     setSaving(true)
     try {
-      const ref = 'SC-' + Date.now().toString().slice(-4)
+      const ref = form.order_ref.trim() || 'SC-' + Date.now().toString().slice(-4)
       const order = await createOrder({ ...form, order_ref: ref })
       onCreated(order)
       toast(`Order ${ref} created`)
@@ -55,13 +55,20 @@ export default function NewOrderModal({ onClose, onCreated }) {
       title="New order"
       onClose={onClose}
       footer={<><Btn onClick={onClose}>Cancel</Btn><Btn onClick={handleSubmit} disabled={saving} variant="primary">{saving ? 'Creating…' : 'Create order'}</Btn></>}
+      wide
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+        <Field label="Production notes">
+          <textarea value={form.notes} onChange={e => setF('notes', e.target.value)} style={{ minHeight: 50, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '' }} placeholder="Special requests, urgency…" />
+        </Field>
         <SectionLabel>Vehicle and product</SectionLabel>
         <Row>
           <Field label="Car (make / model / year) *"><input value={form.car} onChange={e => setF('car', e.target.value)} placeholder="e.g. Mercedes-Benz C-Class 2019" autoFocus /></Field>
           <Field label="VIN number"><input value={form.vin} onChange={e => setF('vin', e.target.value)} placeholder="17-character VIN" style={{ fontFamily: 'monospace', fontSize: 11 }} /></Field>
         </Row>
+        <Field label="Year (specific to this order)">
+          <input value={form.year} onChange={e => setF('year', e.target.value)} placeholder="e.g. 2019" style={{ width: 100 }} />
+        </Field>
         <Field label="Position (select all that apply)">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {POSITION_OPTIONS.map(p => (
@@ -91,8 +98,9 @@ export default function NewOrderModal({ onClose, onCreated }) {
         </Row>
         <Row>
           <Field label="Quantity"><input type="number" min="1" value={form.quantity} onChange={e => setF('quantity', parseInt(e.target.value))} style={{ width: 80 }} /></Field>
-          <Field label="Production notes"><input value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="Special requests, urgency…" /></Field>
         </Row>
+        <SectionLabel>Files (photos, documents, VIN images)</SectionLabel>
+        <div style={{ border: '1px dashed #ccc', borderRadius: 6, padding: 14, textAlign: 'center', fontSize: 12, color: '#aaa' }}>Photos can be added after creating the order</div>
         <SectionLabel>Customer and shipping</SectionLabel>
         <Row>
           <Field label="Customer name *"><input value={form.customer_name} onChange={e => setF('customer_name', e.target.value)} placeholder="Full name" /></Field>
@@ -100,9 +108,11 @@ export default function NewOrderModal({ onClose, onCreated }) {
         </Row>
         <Row>
           <Field label="Email"><input type="email" value={form.email} onChange={e => setF('email', e.target.value)} placeholder="customer@example.com" /></Field>
-          <Field label="Tracking number"><input value={form.tracking_number || ''} onChange={e => setF('tracking_number', e.target.value)} placeholder="e.g. 1Z6V1294..." /></Field>
+          <Field label="Tracking number"><input value={form.tracking_number} onChange={e => setF('tracking_number', e.target.value)} placeholder="e.g. 1Z6V1294..." /></Field>
         </Row>
-        <Field label="Shipping address"><textarea value={form.address} onChange={e => setF('address', e.target.value)} style={{ minHeight: 60 }} placeholder={'Street\nCity\nPostcode\nCountry'} /></Field>
+        <Field label="Shipping address">
+          <textarea value={form.address} onChange={e => setF('address', e.target.value)} style={{ minHeight: 60 }} placeholder={'Street\nCity\nPostcode\nCountry'} />
+        </Field>
         <Row>
           <Field label="Source">
             <select value={form.source} onChange={e => setF('source', e.target.value)}>
@@ -111,6 +121,9 @@ export default function NewOrderModal({ onClose, onCreated }) {
           </Field>
           <Field label="Order date"><input type="date" value={form.order_date} onChange={e => setF('order_date', e.target.value)} /></Field>
         </Row>
+        <Field label="Order number (leave blank to auto-generate)">
+          <input value={form.order_ref} onChange={e => setF('order_ref', e.target.value)} placeholder="e.g. SC-1234 or leave blank" />
+        </Field>
       </div>
     </Modal>
   )
