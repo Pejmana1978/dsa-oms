@@ -107,7 +107,8 @@ export default function Dashboard() {
             const badge = getBadge(p)
             const isActive = activePage === p
             return (
-              <div key={p} onClick={() => setPage(p)} style={{
+              <React.Fragment key={p}>
+              <div onClick={() => setPage(p)} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
                 color: isActive ? '#1a1a1a' : '#888', fontWeight: isActive ? 600 : 400,
@@ -130,6 +131,7 @@ export default function Dashboard() {
                   <span style={{ background: '#E24B4A', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{pendingCount}</span>
                 </div>
               )}
+              </React.Fragment>
             )
           })}
 
