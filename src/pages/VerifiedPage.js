@@ -101,43 +101,39 @@ export default function VerifiedPage({ orders, setOrders, role }) {
         </div>
       )}
       {verified.length > 0 && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '4px 10px', cursor: 'pointer' }}>
-          <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+        <div style={{ marginBottom: 8, paddingLeft: 10 }}>
+          <input type="checkbox" checked={allChecked} onChange={toggleAll} style={{ cursor: 'pointer', marginRight: 8 }} />
           <span style={{ fontSize: 12, color: '#888' }}>{allChecked ? 'Deselect all' : 'Select all'}</span>
-        </label>
+        </div>
       )}
       {verified.map(o => (
-        <div key={o.id} style={{ background: checked[o.id] ? '#F0F7FF' : '#fff', border: checked[o.id] ? '1px solid #185FA5' : '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <input type="checkbox" checked={!!checked[o.id]} onChange={() => toggleCheck(o.id)} style={{ marginTop: 2, cursor: 'pointer', flexShrink: 0 }} />
-            <div style={{ flex: '1 1 0', minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div style={{ cursor: 'pointer', minWidth: 0, flex: 1 }} onClick={() => setSelected(o)}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
-                  <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name} — {o.car}</div>
-                </div>
-                <div style={{ flexShrink: 0, marginLeft: 8 }}>
-                  <StageBadge stage={o.stage} />
-                </div>
+        <div key={o.id} onClick={() => toggleCheck(o.id)} style={{ background: checked[o.id] ? '#F0F7FF' : '#fff', border: checked[o.id] ? '1px solid #185FA5' : '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10, cursor: 'pointer' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="checkbox" checked={!!checked[o.id]} onChange={() => toggleCheck(o.id)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', flexShrink: 0 }} />
+              <div onClick={e => { e.stopPropagation(); setSelected(o) }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.customer_name} — {o.car}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10 }}>
-                {[
-                  ['Position', (o.position || []).join(', ') || '—'],
-                  ['Material', o.material || '—'],
-                  ['Color / Trim', o.color || '—'],
-                  ['Quantity', o.quantity || 1],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
-                    <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
-                  </div>
-                ))}
-              </div>
-              {o.notes && (
-                <div style={{ marginTop: 8, fontSize: 11, background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 4, padding: '3px 8px', display: 'inline-block' }}>{o.notes}</div>
-              )}
             </div>
+            <StageBadge stage={o.stage} />
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, paddingLeft: 26 }}>
+            {[
+              ['Position', (o.position || []).join(', ') || '—'],
+              ['Material', o.material || '—'],
+              ['Color / Trim', o.color || '—'],
+              ['Quantity', o.quantity || 1],
+            ].map(([k, v]) => (
+              <div key={k}>
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {o.notes && (
+            <div style={{ marginTop: 8, marginLeft: 26, fontSize: 11, background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 4, padding: '3px 8px', display: 'inline-block' }}>{o.notes}</div>
+          )}
         </div>
       ))}
       {selected && <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />}
