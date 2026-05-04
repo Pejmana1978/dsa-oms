@@ -4,6 +4,7 @@ import { fetchOrders } from '../lib/api'
 import { ROLE_PAGES, PAGE_LABELS } from '../lib/constants'
 import { ToastContainer, useToast } from '../components/Toast'
 import OrdersPage from './OrdersPage'
+import VerifiedPage from './VerifiedPage'
 import ProductionPage from './ProductionPage'
 import ShippingPage from './ShippingPage'
 import ShippingUSPage from './ShippingUSPage'
@@ -12,9 +13,9 @@ import StockPage from './StockPage'
 import ArchivePage from './ArchivePage'
 import StatsPage from './StatsPage'
 import UsersPage from './UsersPage'
-
 const NAV_ICONS = {
   orders: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/><line x1="4" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="7.5" x2="10" y2="7.5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="10" x2="7" y2="10" stroke="currentColor" strokeWidth="1.1"/></svg>,
+  verified: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   production: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M7 4v3l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   shipping: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/></svg>,
   stats: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="7" width="3" height="6" rx="1" fill="currentColor" opacity=".6"/><rect x="5.5" y="4" width="3" height="9" rx="1" fill="currentColor" opacity=".8"/><rect x="10" y="1" width="3" height="12" rx="1" fill="currentColor"/></svg>,
@@ -24,7 +25,6 @@ const NAV_ICONS = {
   shipping_us: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/><text x="4" y="9" fontSize="4" fill="currentColor">US</text></svg>,
   shipping_sweden: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/><text x="4" y="9" fontSize="4" fill="currentColor">SE</text></svg>,
 }
-
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
   const [orders, setOrders] = useState([])
@@ -32,18 +32,14 @@ export default function Dashboard() {
   const [page, setPage] = useState(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const toast = useToast()
-
   const role = profile?.role || 'sales'
   const pages = ROLE_PAGES[role] || ['orders']
-
   useEffect(() => {
     if (profile && !page) setPage(pages[0])
   }, [profile])
-
   useEffect(() => {
     loadOrders()
   }, [])
-
   async function loadOrders() {
     try {
       const data = await fetchOrders()
@@ -53,23 +49,20 @@ export default function Dashboard() {
     }
     setLoading(false)
   }
-
   const active = orders.filter(o => !o.archived)
-  const pendingCount = active.filter(o => ['New', 'Contacted'].includes(o.stage)).length
-  const prodCount = active.filter(o => ['Verified', 'In Production'].includes(o.stage)).length
+  const pendingCount = active.filter(o => o.stage === 'New').length
+  const verifiedCount = active.filter(o => o.stage === 'Verified').length
+  const prodCount = active.filter(o => o.stage === 'In Production').length
   const shipUSCount = active.filter(o => o.stage === 'Production Complete').length
   const shipSwedCount = active.filter(o => o.stage === 'Shipped to Sweden').length
-
   function getBadge(p) {
-
+    if (p === 'verified' && verifiedCount > 0) return verifiedCount
     if (p === 'production' && prodCount > 0) return prodCount
     if (p === 'shipping_us' && shipUSCount > 0) return shipUSCount
     if (p === 'shipping_sweden' && shipSwedCount > 0) return shipSwedCount
     return null
   }
-
   const activePage = page && pages.includes(page) ? page : pages[0]
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       {/* Topbar */}
@@ -98,7 +91,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div style={{ width: 185, borderRight: '1px solid #e0ddd8', padding: 10, background: '#fff', display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0, overflowY: 'auto' }}>
@@ -134,18 +126,16 @@ export default function Dashboard() {
               </React.Fragment>
             )
           })}
-
         </div>
-
         {/* Main */}
         <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#f5f5f4' }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{PAGE_LABELS[activePage]}</div>
-
           {loading ? (
             <div style={{ textAlign: 'center', padding: 48, color: '#bbb', fontSize: 13 }}>Loading orders…</div>
           ) : (
             <>
               {activePage === 'orders' && <OrdersPage orders={orders} setOrders={setOrders} role={role} />}
+              {activePage === 'verified' && <VerifiedPage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'production' && <ProductionPage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'shipping' && <ShippingPage orders={orders} setOrders={setOrders} role={role} />}
               {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
@@ -158,7 +148,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
       <ToastContainer />
     </div>
   )
