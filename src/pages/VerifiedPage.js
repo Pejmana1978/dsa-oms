@@ -109,11 +109,11 @@ export default function VerifiedPage({ orders, setOrders, role }) {
       {verified.map(o => (
         <div key={o.id} onClick={() => toggleCheck(o.id)} style={{ background: checked[o.id] ? '#F0F7FF' : '#fff', border: checked[o.id] ? '1px solid #185FA5' : '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10, cursor: 'pointer' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
               <input type="checkbox" checked={!!checked[o.id]} onChange={() => toggleCheck(o.id)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', flexShrink: 0 }} />
-              <div onClick={e => { e.stopPropagation(); setSelected(o) }}>
+              <div onClick={e => { e.stopPropagation(); setSelected(o) }} style={{ minWidth: 0, maxWidth: 600 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
-                <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.customer_name} — {o.car}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name} — {o.car}</div>
               </div>
             </div>
             <StageBadge stage={o.stage} />
