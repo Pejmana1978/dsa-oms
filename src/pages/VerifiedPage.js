@@ -91,7 +91,7 @@ export default function VerifiedPage({ orders, setOrders, role }) {
   const allChecked = verified.length > 0 && verified.every(o => checked[o.id])
 
   return (
-    <>
+    <div style={{ width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 12, color: '#888' }}>{verified.length} order{verified.length !== 1 ? 's' : ''} awaiting production</span>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -149,6 +149,6 @@ export default function VerifiedPage({ orders, setOrders, role }) {
         </div>
       ))}
       {selected && <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />}
-    </>
+    </div>
   )
 }
