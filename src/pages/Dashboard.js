@@ -61,7 +61,7 @@ export default function Dashboard() {
   const shipSwedCount = active.filter(o => o.stage === 'Shipped to Sweden').length
 
   function getBadge(p) {
-    if (p === 'orders' && pendingCount > 0) return pendingCount
+
     if (p === 'production' && prodCount > 0) return prodCount
     if (p === 'shipping_us' && shipUSCount > 0) return shipUSCount
     if (p === 'shipping_sweden' && shipSwedCount > 0) return shipSwedCount
