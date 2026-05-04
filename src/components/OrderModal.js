@@ -6,9 +6,7 @@ import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
 import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
 import { useToast } from './Toast'
-
 const TABS = ['Details', 'Email / SMS', 'Print / Export']
-
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -17,15 +15,12 @@ function Field({ label, children }) {
     </div>
   )
 }
-
 function Row({ children }) {
   return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>{children}</div>
 }
-
 function SectionLabel({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 600, color: '#666', borderBottom: '1px solid #e0ddd8', paddingBottom: 5, marginTop: 4 }}>{children}</div>
 }
-
 export default function OrderModal({ order, onClose, onUpdated, role }) {
   const [tab, setTab] = useState('Details')
   const [form, setForm] = useState({ ...order })
@@ -34,21 +29,27 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   const [lightboxIdx, setLightboxIdx] = useState(null)
   const [photos, setPhotos] = useState(order.photos || [])
   const [documents, setDocuments] = useState(order.documents || [])
+  const [initialForm] = useState({ ...order })
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm)
   const fileRef = useRef()
   const toast = useToast()
-
   const canEdit = role === 'admin' || role === 'sales' || role === 'production'
-
+  function confirmClose() {
+    if (isDirty) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to close?')) onClose()
+    } else {
+      onClose()
+    }
+  }
   const imagePhotos = photos.filter(p => {
     const ext = (p.name || '').split('.').pop().toLowerCase()
     return ['jpg','jpeg','png','gif','webp'].includes(ext) && p.url
   })
-
   useEffect(() => {
     function handleKey(e) {
       if (e.key === 'Escape') {
         if (lightboxIdx !== null) setLightboxIdx(null)
-        else onClose()
+        else confirmClose()
       }
       if (lightboxIdx !== null) {
         if (e.key === 'ArrowRight') setLightboxIdx(i => Math.min(i + 1, imagePhotos.length - 1))
@@ -57,32 +58,25 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [lightboxIdx, onClose, imagePhotos.length])
-
+  }, [lightboxIdx, onClose, imagePhotos.length, isDirty])
   function setF(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
-
   const COUNTRY_NAMES = { GB: 'United Kingdom', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', PL: 'Poland', PT: 'Portugal', IE: 'Ireland', CH: 'Switzerland', US: 'United States', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', JP: 'Japan' }
   function expandAddress(addr) {
     if (!addr) return ''
     return addr.replace(/,\s*([A-Z]{2})$/, (m, code) => COUNTRY_NAMES[code] ? ', ' + COUNTRY_NAMES[code] : m)
   }
-
   function parseTitle() {
     const title = form.car || ''
-    // Extract year range
     const yearMatch = title.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
     const year = yearMatch ? yearMatch[0] : ''
-    // Extract make/model - look for common patterns
     const makeModelMatch = title.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
     const makeModel = makeModelMatch ? makeModelMatch[1].trim() : ''
     const car = makeModel && year ? `${makeModel} ${year}` : makeModel || title
-    // Extract position
     const positions = []
     if (/driver\s+bottom/i.test(title)) positions.push('Driver Bottom')
     if (/driver\s+top/i.test(title)) positions.push('Driver Top')
     if (/passenger\s+bottom/i.test(title)) positions.push('Passenger Bottom')
     if (/passenger\s+top/i.test(title)) positions.push('Passenger Top')
-    // Extract material
     let material = ''
     if (/leather\s+perf/i.test(title)) material = 'Leather perf'
     else if (/leather/i.test(title)) material = 'Leather'
@@ -90,7 +84,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     else if (/vinyl/i.test(title)) material = 'Vinyl'
     else if (/alcantara/i.test(title)) material = 'Vinyl & Alcantara'
     else if (/cloth/i.test(title)) material = 'Cloth'
-    // Extract color
     let color = ''
     const colorMatch = title.match(/\b(black|grey|gray|beige|brown|red|blue|navy|tan|white|cream|camel|cognac|bordeaux)\b/i)
     if (colorMatch) color = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase()
@@ -102,7 +95,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       color: color || prev.color,
     }))
   }
-
   async function save(advanceStage = false) {
     setSaving(true)
     try {
@@ -114,7 +106,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       const updated = await updateOrder(order.id, updates)
       onUpdated(updated)
       toast(advanceStage ? `Advanced to "${updates.stage}"` : 'Order saved')
-      // Push tracking to eBay if tracking number was added/changed
       if (order.source === 'eBay' && updates.tracking_number && updates.tracking_number !== order.tracking_number) {
         fetch('/api/ebay-tracking', {
           method: 'POST',
@@ -128,7 +119,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     }
     setSaving(false)
   }
-
   async function compressImage(file, maxWidth = 1200, quality = 0.75) {
     return new Promise(resolve => {
       const img = new Image()
@@ -147,7 +137,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       img.src = url
     })
   }
-
   async function handlePhotoUpload(e) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
@@ -169,7 +158,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       }
     }
   }
-
   async function handleThumbnailUpload(file) {
     if (!file) return
     try {
@@ -181,7 +169,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       toast(err.message, 'error')
     }
   }
-
   async function handleDocUpload(e) {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
@@ -203,7 +190,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       }
     }
   }
-
   async function handleDeleteDoc(doc, idx) {
     try {
       if (doc.path) await deletePhoto(doc.path)
@@ -215,7 +201,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       toast(err.message, 'error')
     }
   }
-
   async function handleDeletePhoto(photo, idx) {
     try {
       if (photo.path) await deletePhoto(photo.path)
@@ -227,38 +212,32 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       toast(err.message, 'error')
     }
   }
-
   const stageIdx = STAGES.indexOf(form.stage)
   const canAdvance = stageIdx < STAGES.length - 1
   const firstName = order.customer_name?.split(' ')[0] || 'there'
-
   const verifyTpl = `Hi ${firstName},\n\nWe have received your order ${order.order_ref} for ${order.seats} seat covers for your ${order.car}.\n\nTo proceed, please send us:\n1. A photo of your car interior (showing the seats)\n2. A photo of your VIN plate\n\nYou can reply directly to this email or send via WhatsApp.\n\nThanks,\nSeatCover Team`
   const shipTpl = `Hi ${firstName},\n\nGreat news - your order ${order.order_ref} has been shipped!\n\nProduct: ${order.seats} seat covers, ${order.color}\nCar: ${order.car}\n\nYou will receive a tracking number shortly.\n\nThanks,\nSeatCover Team`
   const smsTpl = `SeatCover: Your order ${order.order_ref} is confirmed. We will contact you shortly about verification. Reply STOP to opt out.`
   const waTpl = `Hi ${firstName}! Your SeatCover order *${order.order_ref}* is confirmed!\n\nWe need a couple of photos to get started:\n- Your car interior (seats)\n- Your VIN plate\n\nThanks!`
-
   function copyText(text) {
     navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Copy failed', 'error'))
   }
-
   function fmtDate(d) { return d ? d.slice(0, 10).split('-').reverse().join('/') : '-' }
-
   const footer = tab === 'Details' && canEdit ? (
     <>
-      <Btn onClick={onClose}>Cancel</Btn>
+      <Btn onClick={confirmClose}>Cancel</Btn>
       <Btn onClick={() => save(false)} disabled={saving}>Save</Btn>
       {canAdvance && <Btn onClick={() => save(true)} disabled={saving} variant="primary">Save & advance</Btn>}
     </>
   ) : tab === 'Print / Export' ? (
     <>
-      <Btn onClick={onClose}>Close</Btn>
+      <Btn onClick={confirmClose}>Close</Btn>
       <Btn onClick={() => window.print()} variant="success">Print production sheet</Btn>
       <Btn onClick={() => window.print()} variant="primary">Print shipping label</Btn>
     </>
-  ) : <Btn onClick={onClose}>Close</Btn>
-
+  ) : <Btn onClick={confirmClose}>Close</Btn>
   return (
-    <Modal title={`${order.order_ref} - ${order.customer_name}`} onClose={onClose} footer={footer} wide>
+    <Modal title={`${order.order_ref} - ${order.customer_name}`} onClose={confirmClose} footer={footer} wide>
       <div style={{ display: 'flex', borderBottom: '1px solid #e0ddd8', marginBottom: 16 }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
@@ -269,11 +248,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           }}>{t}</button>
         ))}
       </div>
-
       {tab === 'Details' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <StageProgress stage={form.stage} />
-
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#f9f9f8', borderRadius: 8, padding: 10, border: '1px solid #e0ddd8' }}>
             <div
               onDragOver={e => { e.preventDefault(); e.currentTarget.style.opacity = '0.7' }}
@@ -299,9 +276,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               {order.source === 'eBay' && order.order_ref && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + order.order_ref} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay order →</a></div>}
             </div>
           </div>
-
-
-
           <Field label="Production notes">
             <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 50, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} />
           </Field>
@@ -472,11 +446,8 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               </select>
             </Field>
           )}
-
-
         </div>
       )}
-
       {tab === 'Email / SMS' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
@@ -498,7 +469,6 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           </div>
         </div>
       )}
-
       {tab === 'Print / Export' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionLabel>Production sheet</SectionLabel>
