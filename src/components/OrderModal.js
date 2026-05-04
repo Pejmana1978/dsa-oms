@@ -99,7 +99,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     setSaving(true)
     try {
       let updates = { ...form, photos, documents }
-      if (advanceStage) {
+      if (updates.ship_from_stock) {
+        updates.stage = 'Shipped to Sweden'
+      } else if (advanceStage) {
         const idx = STAGES.indexOf(form.stage)
         if (idx < STAGES.length - 1) updates.stage = STAGES[idx + 1]
       }
