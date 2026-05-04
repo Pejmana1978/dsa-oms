@@ -117,9 +117,10 @@ export default function VerifiedPage({ orders, setOrders, role }) {
         </div>
       )}
       {verified.map(o => (
-        <div key={o.id} style={{ background: checked[o.id] ? '#F0F7FF' : '#fff', border: checked[o.id] ? '1px solid #185FA5' : '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        <div key={o.id} style={{ background: checked[o.id] ? '#F0F7FF' : '#fff', border: checked[o.id] ? '1px solid #185FA5' : '1px solid #e0ddd8', borderRadius: 10, padding: '13px 15px', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <input type="checkbox" checked={!!checked[o.id]} onChange={() => toggleCheck(o.id)} style={{ marginTop: 3, cursor: 'pointer', flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div style={{ cursor: 'pointer' }} onClick={() => setSelected(o)}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
@@ -143,6 +144,7 @@ export default function VerifiedPage({ orders, setOrders, role }) {
             {o.notes && (
               <div style={{ marginTop: 8, fontSize: 11, background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 4, padding: '3px 8px', display: 'inline-block' }}>{o.notes}</div>
             )}
+          </div>
           </div>
         </div>
       ))}
