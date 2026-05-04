@@ -65,7 +65,6 @@ export default function Dashboard() {
   const activePage = page && pages.includes(page) ? page : pages[0]
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      {/* Topbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 50, borderBottom: '1px solid #e0ddd8', background: '#fff', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 28, height: 28, background: '#185FA5', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -92,7 +91,6 @@ export default function Dashboard() {
         </div>
       </div>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Sidebar */}
         <div style={{ width: 185, borderRight: '1px solid #e0ddd8', padding: 10, background: '#fff', display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0, overflowY: 'auto' }}>
           <div style={{ fontSize: 10, color: '#bbb', padding: '8px 8px 3px', letterSpacing: '.06em', textTransform: 'uppercase' }}>Navigation</div>
           {pages.map(p => {
@@ -127,7 +125,6 @@ export default function Dashboard() {
             )
           })}
         </div>
-        {/* Main */}
         <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#f5f5f4' }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{PAGE_LABELS[activePage]}</div>
           {loading ? (
