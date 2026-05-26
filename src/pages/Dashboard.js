@@ -13,6 +13,7 @@ import StockPage from './StockPage'
 import ArchivePage from './ArchivePage'
 import StatsPage from './StatsPage'
 import UsersPage from './UsersPage'
+import CustomerServicePage from './CustomerServicePage'
 const NAV_ICONS = {
   orders: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/><line x1="4" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="7.5" x2="10" y2="7.5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="10" x2="7" y2="10" stroke="currentColor" strokeWidth="1.1"/></svg>,
   verified: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.2"/><path d="M4.5 7l2 2 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
@@ -24,6 +25,7 @@ const NAV_ICONS = {
   archive: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1 6h12" stroke="currentColor" strokeWidth="1.2"/><path d="M5 8.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   shipping_us: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/><text x="4" y="9" fontSize="4" fill="currentColor">US</text></svg>,
   shipping_sweden: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/><text x="4" y="9" fontSize="4" fill="currentColor">SE</text></svg>,
+  customer_service: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="3" stroke="currentColor" strokeWidth="1.2"/><path d="M1 13c0-2.2 1.8-4 4-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><rect x="8" y="7" width="5" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 9.5h1M10.5 9v1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>,
 }
 export default function Dashboard() {
   const { user, profile, signOut } = useAuth()
@@ -125,25 +127,32 @@ export default function Dashboard() {
             )
           })}
         </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#f5f5f4' }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{PAGE_LABELS[activePage]}</div>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 48, color: '#bbb', fontSize: 13 }}>Loading orders…</div>
-          ) : (
-            <>
-              {activePage === 'orders' && <OrdersPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'verified' && <VerifiedPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'production' && <ProductionPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'shipping' && <ShippingPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'stock' && <StockPage />}
-              {activePage === 'archive' && <ArchivePage orders={orders} setOrders={setOrders} role={role} />}
-              {activePage === 'stats' && <StatsPage orders={orders} />}
-              {activePage === 'users' && <UsersPage />}
-            </>
-          )}
-        </div>
+        {activePage === 'customer_service' ? (
+          <div style={{ flex: 1, overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, padding: '11px 16px', borderBottom: '1px solid #e0ddd8', flexShrink: 0 }}>Customer service</div>
+            <div style={{ flex: 1, overflow: 'hidden' }}><CustomerServicePage /></div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, overflow: 'auto', padding: 16, background: '#f5f5f4' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>{PAGE_LABELS[activePage]}</div>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 48, color: '#bbb', fontSize: 13 }}>Loading orders…</div>
+            ) : (
+              <>
+                {activePage === 'orders' && <OrdersPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'verified' && <VerifiedPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'production' && <ProductionPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'shipping' && <ShippingPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'stock' && <StockPage />}
+                {activePage === 'archive' && <ArchivePage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'stats' && <StatsPage orders={orders} />}
+                {activePage === 'users' && <UsersPage />}
+              </>
+            )}
+          </div>
+        )}
       </div>
       <ToastContainer />
     </div>

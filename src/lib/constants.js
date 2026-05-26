@@ -8,22 +8,23 @@ export const STAGES = [
   'Delivered'
 ]
 export const ROLE_PAGES = {
-  admin:           ['orders', 'verified', 'production', 'shipping_us', 'shipping_sweden', 'stock', 'stats', 'archive', 'users'],
-  sales:           ['orders', 'stats', 'archive'],
+  admin:           ['orders', 'verified', 'production', 'shipping_us', 'shipping_sweden', 'stock', 'stats', 'archive', 'users', 'customer_service'],
+  sales:           ['orders', 'stats', 'archive', 'customer_service'],
   production:      ['production'],
   shipping_us:     ['shipping_us'],
   shipping_sweden: ['shipping_sweden'],
 }
 export const PAGE_LABELS = {
-  orders:          'All orders',
-  verified:        'Verified orders',
-  production:      'Production queue',
-  shipping_us:     'Shipping (USA)',
-  shipping_sweden: 'Shipping (Sweden)',
-  stock:           'Sweden stock',
-  archive:         'Archive',
-  stats:           'Overview',
-  users:           'Users',
+  orders:           'All orders',
+  verified:         'Verified orders',
+  production:       'Production queue',
+  shipping_us:      'Shipping (USA)',
+  shipping_sweden:  'Shipping (Sweden)',
+  stock:            'Sweden stock',
+  archive:          'Archive',
+  stats:            'Overview',
+  users:            'Users',
+  customer_service: 'Customer service',
 }
 export const BADGE_STYLES = {
   'New':                  { background: '#E6F1FB', color: '#0C447C' },
