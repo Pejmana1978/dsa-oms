@@ -259,7 +259,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               onDragLeave={e => { e.currentTarget.style.opacity = '1' }}
               onDrop={e => { e.preventDefault(); e.currentTarget.style.opacity = '1'; const file = e.dataTransfer.files[0]; if (file) handleThumbnailUpload(file) }}
               onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = e => handleThumbnailUpload(e.target.files[0]); input.click() }}
-              style={{ position: 'relative', width: 80, height: 80, flexShrink: 0, cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px dashed #ccc' }}>
+              style={{ position: 'relative', width: 160, height: 160, flexShrink: 0, cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px dashed #ccc' }}>
               {form.thumbnail
                 ? <img src={form.thumbnail} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#aaa', textAlign: 'center', padding: 4 }}>Drop image here</div>}
