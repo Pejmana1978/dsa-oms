@@ -4,6 +4,8 @@ import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { getOrderItems } from '../lib/orderItems'
+import { buildSheetHTML } from '../lib/productionSheet'
 
 export default function VerifiedPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
@@ -23,27 +25,6 @@ export default function VerifiedPage({ orders, setOrders, role }) {
     const next = {}
     verified.forEach(o => { next[o.id] = !allChecked })
     setChecked(next)
-  }
-
-  function buildSheetHTML(o) {
-    const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
-    const positions = (o.position || []).join(' & ') || '—'
-    const isMultiPos = (o.position||[]).length > 1
-    const photosRow = customerPhotos.length > 0
-      ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' +
-        customerPhotos.map(p => '<img src="' + p.url + '" style="height:120px;max-width:160px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" loading="lazy"/>').join('') + '</div>' : ''
-    const thumbImg = o.thumbnail ? '<img src="' + o.thumbnail.replace('s-l1600','s-l500') + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block"/>' : ''
-    const notesHtml = o.notes ? '<div style="font-size:11px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:3px 7px;margin-top:6px;display:inline-block">' + o.notes + '</div>' : ''
-    const lastCol = (o.vin ? '<div style="font-size:10px;font-family:monospace;color:#555;margin-bottom:4px">VIN: ' + o.vin + '</div>' : '') +
-      (o.year ? '<div style="font-size:11px;color:#555;margin-bottom:6px">Year: ' + o.year + '</div>' : '') + notesHtml
-    return '<div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:16px;page-break-inside:avoid">' +
-      '<table style="width:100%;border-collapse:collapse"><tr>' +
-      '<td style="width:22%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;line-height:1.3">' + o.car + '</div><div style="font-size:11px;color:#666;margin-top:3px">Order: ' + o.order_ref + '</div></td>' +
-      '<td style="width:28%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;color:' + (isMultiPos ? '#d97706' : '#000') + '">' + positions + '</div><div style="font-size:13px;margin-top:3px">' + (o.material||'—') + '</div><div style="font-size:13px;color:#333">' + (o.color||'—') + '</div></td>' +
-      '<td style="width:8%;vertical-align:top;text-align:center"><div style="font-size:48px;font-weight:bold;line-height:1">' + (o.quantity||1) + '</div></td>' +
-      '<td style="width:16%;vertical-align:top;padding:0 10px">' + thumbImg + '</td>' +
-      '<td style="width:26%;vertical-align:top">' + lastCol + '</td>' +
-      '</tr></table>' + photosRow + '</div>'
   }
 
   function batchPrint() {
@@ -112,22 +93,27 @@ export default function VerifiedPage({ orders, setOrders, role }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
               <input type="checkbox" checked={!!checked[o.id]} onChange={() => toggleCheck(o.id)} onClick={e => e.stopPropagation()} style={{ cursor: 'pointer', flexShrink: 0, width: 16, height: 16 }} />
               <div onClick={e => { e.stopPropagation(); setSelected(o) }} style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}</div>
-                <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name} — {o.car}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{o.order_ref}{getOrderItems(o).length > 1 ? <span style={{ fontSize: 10, fontWeight: 700, color: '#d97706', marginLeft: 8 }}>⚠ {getOrderItems(o).length} items</span> : null}</div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.customer_name} — {getOrderItems(o)[0].car || o.car}</div>
               </div>
             </div>
             <StageBadge stage={o.stage} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, paddingLeft: 26 }}>
-            {[
-              ['Position', (o.position || []).join(', ') || '—'],
-              ['Material', o.material || '—'],
-              ['Color / Trim', o.color || '—'],
-              ['Quantity', o.quantity || 1],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div>
+          <div style={{ paddingLeft: 26, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {getOrderItems(o).map((it, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 0.5fr', gap: 10, borderTop: i > 0 ? '1px dashed #e0ddd8' : 'none', paddingTop: i > 0 ? 8 : 0 }}>
+                {[
+                  ['Car / position', `${it.car || it.title || '—'}${(it.position || []).length ? ' · ' + (it.position || []).join(', ') : ''}`],
+                  ['Material', it.material || '—'],
+                  ['Color / Trim', it.color || '—'],
+                  ['VIN', it.vin || '—'],
+                  ['Qty', it.quantity || 1],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
