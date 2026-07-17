@@ -7,7 +7,7 @@ import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
 import { supabase } from '../lib/supabase'
-import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
+import { getOrderItems, itemThumb } from '../lib/orderItems'
 
 export default function OrdersPage({ orders, setOrders, role }) {
   const [q, setQ] = useState('')
@@ -165,11 +165,26 @@ export default function OrdersPage({ orders, setOrders, role }) {
                   })()}
                 </td>
                 <td style={{ padding: '9px 11px' }}>
-                  <div style={{ fontSize: 12 }}>{o.car}</div>
-                  {isMultiItem(o) && <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706' }}>⚠ {o.items.length} items in this order</div>}
-                  <div style={{ fontSize: 10, color: '#aaa' }}>{o.color}</div>
-                  {o.ebay_item_id && <a href={'https://www.ebay.co.uk/itm/' + o.ebay_item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
-                  {o.source === 'eBay' && o.order_ref && <a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + o.order_ref} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View order →</a>}
+                  {(() => {
+                    const its = getOrderItems(o)
+                    if (its.length > 1) {
+                      return <>
+                        <div style={{ fontSize: 12 }}>{its[0].title || its[0].car}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706' }}>⚠ {its.length} items in this order</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+                          {its.map((it, i) => it.item_id && (
+                            <a key={i} href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>Listing {i + 1} →</a>
+                          ))}
+                        </div>
+                      </>
+                    }
+                    return <>
+                      <div style={{ fontSize: 12 }}>{its[0].car || its[0].title || o.car}</div>
+                      {its[0].color && <div style={{ fontSize: 10, color: '#aaa' }}>{its[0].color}</div>}
+                      {its[0].item_id && <a href={'https://www.ebay.co.uk/itm/' + its[0].item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
+                    </>
+                  })()}
+                  {o.source === 'eBay' && o.order_ref && <a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + o.order_ref} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none', display: 'block', marginTop: 2 }}>View order →</a>}
                 </td>
                 <td style={{ padding: '9px 11px' }}><StageBadge stage={o.stage} /></td>
 
