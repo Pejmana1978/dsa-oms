@@ -1,4 +1,4 @@
-import { getOrderItems } from './orderItems'
+import { getOrderItems, itemThumb } from './orderItems'
 
 export function printPackingSlip(o) {
   const notes = o.notes || ''
@@ -21,7 +21,7 @@ export function printPackingSlip(o) {
       multi ? '' : (allPositions ? `Positions: ${allPositions}` : ''),
       multi ? '' : (color ? `Color: ${color}` : ''),
     ].filter(Boolean).map(d => `<br/>${d}`).join('')
-    return `<tr><td>${it.thumbnail ? `<img src="${it.thumbnail}" style="width:100px;height:100px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:10px"/>` : ''}<span style="display:inline-block;vertical-align:middle;max-width:340px"><strong>${it.title || o.car || ''}</strong>${details}</span></td><td>${it.quantity || 1}</td><td>${currency} ${linePrice}</td><td>0%</td><td>${currency} ${linePrice}</td></tr>`
+    return `<tr><td>${itemThumb(it) ? `<img src="${itemThumb(it)}" style="width:100px;height:100px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:10px"/>` : ''}<span style="display:inline-block;vertical-align:middle;max-width:340px"><strong>${it.title || o.car || ''}</strong>${details}</span></td><td>${it.quantity || 1}</td><td>${currency} ${linePrice}</td><td>0%</td><td>${currency} ${linePrice}</td></tr>`
   }).join('')
   const sharedDetails = multi && (allPositions || color)
     ? `<div style="font-size:12px;margin-top:8px">${allPositions ? `Positions: ${allPositions}` : ''}${allPositions && color ? ' · ' : ''}${color ? `Color: ${color}` : ''}</div>`

@@ -7,7 +7,7 @@ import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
 import { supabase } from '../lib/supabase'
-import { getOrderItems, isMultiItem } from '../lib/orderItems'
+import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
 
 export default function OrdersPage({ orders, setOrders, role }) {
   const [q, setQ] = useState('')
@@ -152,7 +152,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
                 <td style={{ padding: '4px 6px' }}>
                   {(() => {
                     const items = getOrderItems(o)
-                    const thumbs = items.map(it => it.thumbnail).filter(Boolean)
+                    const thumbs = items.map(itemThumb).filter(Boolean)
                     if (thumbs.length === 0) return <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />
                     if (thumbs.length === 1) return <img src={thumbs[0]} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />
                     return (

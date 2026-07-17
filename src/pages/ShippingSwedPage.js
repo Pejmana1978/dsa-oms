@@ -5,7 +5,7 @@ import { updateOrder } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
-import { getOrderItems, isMultiItem } from '../lib/orderItems'
+import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
 
 export default function ShippingSwedPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
@@ -162,12 +162,12 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            {getOrderItems(o).some(it => it.thumbnail) && (
+            {getOrderItems(o).some(it => itemThumb(it)) && (
               <div>
                 <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>{isMultiItem(o) ? `eBay listings (${o.items.length} items)` : 'eBay listing'}</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {getOrderItems(o).map((it, i) => it.thumbnail && (
-                    <img key={i} src={it.thumbnail} alt="eBay" title={it.title} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                  {getOrderItems(o).map((it, i) => itemThumb(it) && (
+                    <img key={i} src={itemThumb(it)} alt="eBay" title={it.title} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
                   ))}
                 </div>
               </div>

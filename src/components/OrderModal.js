@@ -6,7 +6,7 @@ import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
 import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
 import { useToast } from './Toast'
-import { getOrderItems, isMultiItem } from '../lib/orderItems'
+import { getOrderItems, itemThumb } from '../lib/orderItems'
 const TABS = ['Details', 'Email / SMS', 'Print / Export']
 function Field({ label, children }) {
   return (
@@ -22,19 +22,47 @@ function Row({ children }) {
 function SectionLabel({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 600, color: '#666', borderBottom: '1px solid #e0ddd8', paddingBottom: 5, marginTop: 4 }}>{children}</div>
 }
+// Parse an eBay-style title into spec fields (car / position / material / color).
+function parseSpecFromTitle(title) {
+  const t = title || ''
+  const yearMatch = t.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
+  const year = yearMatch ? yearMatch[0] : ''
+  const makeModelMatch = t.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
+  const makeModel = makeModelMatch ? makeModelMatch[1].trim() : ''
+  const car = makeModel && year ? `${makeModel} ${year}` : makeModel || t
+  const positions = []
+  if (/driver\s+bottom/i.test(t)) positions.push('Driver Bottom')
+  if (/driver\s+top/i.test(t)) positions.push('Driver Top')
+  if (/passenger\s+bottom/i.test(t)) positions.push('Passenger Bottom')
+  if (/passenger\s+top/i.test(t)) positions.push('Passenger Top')
+  let material = ''
+  if (/leather\s+perf/i.test(t)) material = 'Leather perf'
+  else if (/leather/i.test(t)) material = 'Leather'
+  else if (/vinyl\s+perf/i.test(t)) material = 'Vinyl perf'
+  else if (/vinyl/i.test(t)) material = 'Vinyl'
+  else if (/alcantara/i.test(t)) material = 'Vinyl & Alcantara'
+  else if (/cloth/i.test(t)) material = 'Cloth'
+  let color = ''
+  const colorMatch = t.match(/\b(black|grey|gray|beige|brown|red|blue|navy|tan|white|cream|camel|cognac|bordeaux)\b/i)
+  if (colorMatch) color = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase()
+  return { car, positions, material, color }
+}
 export default function OrderModal({ order, onClose, onUpdated, role }) {
   const [tab, setTab] = useState('Details')
   const [form, setForm] = useState({ ...order })
+  const [items, setItems] = useState(() => getOrderItems(order))
   const [saving, setSaving] = useState(false)
   const [showStockPicker, setShowStockPicker] = useState(false)
   const [lightboxIdx, setLightboxIdx] = useState(null)
   const [photos, setPhotos] = useState(order.photos || [])
   const [documents, setDocuments] = useState(order.documents || [])
   const [initialForm] = useState({ ...order })
-  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm)
+  const [initialItems] = useState(() => JSON.stringify(getOrderItems(order)))
+  const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm) || JSON.stringify(items) !== initialItems
   const fileRef = useRef()
   const toast = useToast()
   const canEdit = role === 'admin' || role === 'sales' || role === 'production'
+  const multi = items.length > 1
   function confirmClose() {
     if (isDirty) {
       if (window.confirm('You have unsaved changes. Are you sure you want to close?')) onClose()
@@ -61,45 +89,41 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [lightboxIdx, onClose, imagePhotos.length, isDirty])
   function setF(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
+  function setItem(i, patch) { setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it)) }
   const COUNTRY_NAMES = { GB: 'United Kingdom', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', PL: 'Poland', PT: 'Portugal', IE: 'Ireland', CH: 'Switzerland', US: 'United States', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', JP: 'Japan' }
   function expandAddress(addr) {
     if (!addr) return ''
     return addr.replace(/,\s*([A-Z]{2})$/, (m, code) => COUNTRY_NAMES[code] ? ', ' + COUNTRY_NAMES[code] : m)
   }
-  function parseTitle() {
-    const title = form.car || ''
-    const yearMatch = title.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
-    const year = yearMatch ? yearMatch[0] : ''
-    const makeModelMatch = title.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
-    const makeModel = makeModelMatch ? makeModelMatch[1].trim() : ''
-    const car = makeModel && year ? `${makeModel} ${year}` : makeModel || title
-    const positions = []
-    if (/driver\s+bottom/i.test(title)) positions.push('Driver Bottom')
-    if (/driver\s+top/i.test(title)) positions.push('Driver Top')
-    if (/passenger\s+bottom/i.test(title)) positions.push('Passenger Bottom')
-    if (/passenger\s+top/i.test(title)) positions.push('Passenger Top')
-    let material = ''
-    if (/leather\s+perf/i.test(title)) material = 'Leather perf'
-    else if (/leather/i.test(title)) material = 'Leather'
-    else if (/vinyl\s+perf/i.test(title)) material = 'Vinyl perf'
-    else if (/vinyl/i.test(title)) material = 'Vinyl'
-    else if (/alcantara/i.test(title)) material = 'Vinyl & Alcantara'
-    else if (/cloth/i.test(title)) material = 'Cloth'
-    let color = ''
-    const colorMatch = title.match(/\b(black|grey|gray|beige|brown|red|blue|navy|tan|white|cream|camel|cognac|bordeaux)\b/i)
-    if (colorMatch) color = colorMatch[1].charAt(0).toUpperCase() + colorMatch[1].slice(1).toLowerCase()
-    setForm(prev => ({
-      ...prev,
-      car: car || prev.car,
-      position: positions.length > 0 ? positions : prev.position,
-      material: material || prev.material,
-      color: color || prev.color,
-    }))
+  function parseItem(i) {
+    const it = items[i]
+    const { car, positions, material, color } = parseSpecFromTitle(it.car || it.title || '')
+    setItem(i, {
+      car: car || it.car,
+      position: positions.length > 0 ? positions : it.position,
+      material: material || it.material,
+      color: color || it.color,
+    })
   }
   async function save(advanceStage = false) {
     setSaving(true)
     try {
-      let updates = { ...form, photos, documents }
+      // Keep order-level convenience fields synced to the primary item so list
+      // views, templates and packing-slip fallbacks stay correct.
+      const primary = items[0] || {}
+      const sumQty = items.reduce((n, it) => n + (Number(it.quantity) || 0), 0) || 1
+      let updates = {
+        ...form, items, photos, documents,
+        car: primary.car || primary.title || form.car,
+        thumbnail: primary.custom_thumbnail || primary.thumbnail || form.thumbnail,
+        quantity: sumQty,
+        vin: primary.vin || '',
+        year: primary.year || '',
+        position: primary.position || [],
+        position_other: primary.position_other || '',
+        material: primary.material || '',
+        color: primary.color || '',
+      }
       if (updates.ship_from_stock) {
         updates.stage = 'Shipped to Sweden'
       } else if (advanceStage) {
@@ -161,13 +185,16 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       }
     }
   }
-  async function handleThumbnailUpload(file) {
+  // Replace one item's thumbnail with an uploaded image (custom override).
+  async function handleItemThumb(i, file) {
     if (!file) return
     try {
-      const { path, url } = await uploadPhoto(order.id, file)
-      setF('thumbnail', url)
-      await updateOrder(order.id, { thumbnail: url })
-      toast('Thumbnail updated')
+      let f = file
+      const ext = file.name.split('.').pop().toLowerCase()
+      if (['jpg','jpeg','png','webp'].includes(ext)) f = await compressImage(file)
+      const { url } = await uploadPhoto(order.id, f)
+      setItem(i, { custom_thumbnail: url })
+      toast('Thumbnail replaced — save to keep')
     } catch (err) {
       toast(err.message, 'error')
     }
@@ -254,122 +281,116 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       {tab === 'Details' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
           <StageProgress stage={form.stage} />
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#f9f9f8', borderRadius: 8, padding: 10, border: '1px solid #e0ddd8' }}>
-            <div
-              onDragOver={e => { e.preventDefault(); e.currentTarget.style.opacity = '0.7' }}
-              onDragLeave={e => { e.currentTarget.style.opacity = '1' }}
-              onDrop={e => { e.preventDefault(); e.currentTarget.style.opacity = '1'; const file = e.dataTransfer.files[0]; if (file) handleThumbnailUpload(file) }}
-              onClick={() => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.onchange = e => handleThumbnailUpload(e.target.files[0]); input.click() }}
-              style={{ position: 'relative', width: 160, height: 160, flexShrink: 0, cursor: 'pointer', borderRadius: 6, overflow: 'hidden', border: '2px dashed #ccc' }}>
-              {form.thumbnail
-                ? <img src={form.thumbnail} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
-                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#aaa', textAlign: 'center', padding: 4 }}>Drop image here</div>}
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: '0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '0'}>
-                <span style={{ color: '#fff', fontSize: 10 }}>Replace</span>
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6, flex: 1 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{order.car}</div>
-              <div style={{ color: '#888', fontSize: 11 }}>{order.notes}</div>
-              {order.sale_amount && <div style={{ marginTop: 4, fontSize: 11, color: '#555' }}>💰 {order.sale_currency} {order.sale_amount}{order.refund_amount > 0 ? <span style={{ color: '#E24B4A', marginLeft: 8 }}>− {order.sale_currency} {order.refund_amount} refund</span> : ''}</div>}
-              {order.tracking_number && <div style={{ marginTop: 4 }}><a href={'https://www.ups.com/track?tracknum=' + order.tracking_number} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>📦 {order.tracking_number}</a></div>}
-              {order.ebay_item_id && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/itm/' + order.ebay_item_id} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay listing →</a></div>}
-              {order.source === 'eBay' && order.order_ref && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + order.order_ref} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay order →</a></div>}
-            </div>
+          {/* Order summary strip */}
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', background: '#f9f9f8', borderRadius: 8, padding: '8px 12px', border: '1px solid #e0ddd8', fontSize: 11, color: '#555', flexWrap: 'wrap' }}>
+            {order.sale_amount != null && <span>💰 <strong>{order.sale_currency} {order.sale_amount}</strong>{order.refund_amount > 0 ? <span style={{ color: '#E24B4A', marginLeft: 6 }}>− {order.sale_currency} {order.refund_amount} refund</span> : ''}</span>}
+            {order.tracking_number && <a href={'https://www.ups.com/track?tracknum=' + order.tracking_number} target='_blank' rel='noreferrer' style={{ color: '#185FA5', textDecoration: 'none' }}>📦 {order.tracking_number}</a>}
+            {order.source === 'eBay' && order.order_ref && <a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + order.order_ref} target='_blank' rel='noreferrer' style={{ color: '#185FA5', textDecoration: 'none' }}>View eBay order →</a>}
           </div>
-          {isMultiItem(order) && (
-            <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 8, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', marginBottom: 8 }}>⚠ MULTI-ITEM ORDER — {order.items.length} items, ALL must be produced & shipped together</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {getOrderItems(order).map((it, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', background: '#fff', borderRadius: 6, padding: 8, border: '1px solid #eee' }}>
-                    {it.thumbnail
-                      ? <img src={it.thumbnail} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8', flexShrink: 0 }} />
-                      : <div style={{ width: 54, height: 54, borderRadius: 4, background: '#f0ede8', flexShrink: 0 }} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}. {it.title}</div>
-                      <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                        Qty {it.quantity || 1}
-                        {it.price != null ? ` · ${it.currency || ''} ${Number(it.price).toFixed(2)}` : ''}
-                        {it.sku ? ` · SKU ${it.sku}` : ''}
-                      </div>
-                      {it.item_id && <a href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {multi && (
+            <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 700, color: '#92400E' }}>⚠ MULTI-ITEM ORDER — {items.length} items, each with its own spec. ALL produced &amp; shipped together.</div>
           )}
-          <Field label="Production notes">
-            <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 50, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} />
-          </Field>
-          <SectionLabel>Vehicle and product</SectionLabel>
-          <Row>
-            <Field label="Car (make / model / year)">
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <input value={form.car || ''} onChange={e => setF('car', e.target.value)} readOnly={!canEdit} style={{ flex: 1 }} />
-                  {canEdit && order.source === 'eBay' && <button onClick={parseTitle} style={{ fontSize: 11, color: '#185FA5', background: '#E6F1FB', border: '1px solid #b3d4f5', borderRadius: 6, padding: '0 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>⚡ Parse</button>}
-                </div>
-              </Field>
-            <Field label="VIN number"><input value={form.vin || ''} onChange={e => setF('vin', e.target.value)} style={{ fontFamily: 'monospace', fontSize: 11 }} readOnly={!canEdit} /></Field>
-          </Row>
-          <Row>
-            <Field label="Year (specific to this order)"><input value={form.year || ''} onChange={e => setF('year', e.target.value)} readOnly={!canEdit} placeholder="e.g. 2019" style={{ width: 100 }} /></Field>
-          </Row>
-          <Field label="Position (select all that apply)">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {POSITION_OPTIONS.map(p => (
-                <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
-                  <input type="checkbox" disabled={!canEdit}
-                    checked={(form.position || []).includes(p)}
-                    onChange={e => {
-                      const cur = form.position || []
-                      setF('position', e.target.checked ? [...cur, p] : cur.filter(x => x !== p))
-                    }} />
-                  {p}
-                </label>
-              ))}
-            </div>
-            {(form.position || []).includes('Other') && (
-              <input value={form.position_other || ''} onChange={e => setF('position_other', e.target.value)} readOnly={!canEdit} placeholder="Describe other position..." style={{ marginTop: 6, width: '100%' }} />
-            )}
-          </Field>
-          <Row>
-            <Field label="Material">
-              <select value={form.material || ''} onChange={e => setF('material', e.target.value)} disabled={!canEdit}>
-                <option value="">— select —</option>
-                {MATERIAL_OPTIONS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </Field>
-            <Field label="Color + trim code"><input value={form.color || ''} onChange={e => setF('color', e.target.value)} readOnly={!canEdit} placeholder="e.g. Black 040" /></Field>
-          </Row>
-          <Row>
-            <Field label="Quantity"><input type="number" min="1" value={form.quantity || 1} onChange={e => setF('quantity', parseInt(e.target.value))} readOnly={!canEdit} style={{ width: 80 }} /></Field>
-            <Field label="Ship from Sweden stock">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
-                  <input type="checkbox" disabled={!canEdit} checked={form.ship_from_stock || false} onChange={e => setF('ship_from_stock', e.target.checked)} />
-                  Use Sweden stock (skips production)
-                </label>
-                {form.ship_from_stock && canEdit && (
-                  <button onClick={() => setShowStockPicker(true)} style={{ fontSize: 11, color: '#185FA5', background: '#E6F1FB', border: '1px solid #b3d4f5', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', width: 'fit-content' }}>
-                    📦 Select from inventory
-                  </button>
-                )}
-                {form.stock_item && (
-                  <div style={{ fontSize: 11, color: '#27a069', background: '#f0faf5', border: '1px solid #9FE1CB', borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>✅ {form.stock_item.model} — {form.stock_item.type} — {form.stock_item.colour}</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button onClick={() => setShowStockPicker(true)} style={{ fontSize: 10, color: '#185FA5', background: 'none', border: '1px solid #b3d4f5', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}>Change</button>
-                      <button onClick={() => setF('stock_item', null)} style={{ fontSize: 10, color: '#E24B4A', background: 'none', border: '1px solid #f5b3b3', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}>Remove</button>
+          <SectionLabel>{multi ? `Items (${items.length}) — vehicle & product` : 'Vehicle and product'}</SectionLabel>
+          {items.map((it, i) => {
+            const displayThumb = itemThumb(it)
+            return (
+              <div key={i} style={{ border: '1px solid #e0ddd8', borderRadius: 8, padding: 12, background: multi ? '#fcfcfb' : 'transparent', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {multi && <div style={{ fontSize: 12, fontWeight: 700, color: '#185FA5' }}>Item {i + 1} of {items.length}</div>}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ flexShrink: 0, width: 130 }}>
+                    <div
+                      onDragOver={e => { if (!canEdit) return; e.preventDefault(); e.currentTarget.style.opacity = '0.7' }}
+                      onDragLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      onDrop={e => { if (!canEdit) return; e.preventDefault(); e.currentTarget.style.opacity = '1'; const f = e.dataTransfer.files[0]; if (f) handleItemThumb(i, f) }}
+                      onClick={() => { if (!canEdit) return; const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.onchange = e => handleItemThumb(i, e.target.files[0]); inp.click() }}
+                      style={{ position: 'relative', width: 130, height: 130, cursor: canEdit ? 'pointer' : 'default', borderRadius: 6, overflow: 'hidden', border: '2px dashed #ccc' }}>
+                      {displayThumb
+                        ? <img src={displayThumb} alt="Product" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} onError={e => { e.target.style.display = 'none' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#aaa', textAlign: 'center', padding: 4 }}>Drop image here</div>}
+                      {canEdit && <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 9, textAlign: 'center', padding: '2px 0' }}>Click / drop to replace</div>}
                     </div>
+                    {it.custom_thumbnail && (
+                      <div style={{ fontSize: 10, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: '#27a069' }}>✓ custom</span>
+                        {canEdit && <button onClick={() => setItem(i, { custom_thumbnail: '' })} style={{ fontSize: 10, color: '#185FA5', background: 'none', border: '1px solid #b3d4f5', borderRadius: 4, padding: '1px 5px', cursor: 'pointer' }}>revert to eBay</button>}
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {it.title && (
+                      <div style={{ fontSize: 11, color: '#888' }}>{it.title}
+                        {it.item_id && <a href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' style={{ marginLeft: 8, color: '#185FA5', textDecoration: 'none' }}>listing →</a>}
+                        {it.sku && <span style={{ marginLeft: 8, color: '#bbb' }}>SKU {it.sku}</span>}
+                      </div>
+                    )}
+                    <Row>
+                      <Field label="Car (make / model / year)">
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input value={it.car || ''} onChange={e => setItem(i, { car: e.target.value })} readOnly={!canEdit} style={{ flex: 1 }} />
+                          {canEdit && <button onClick={() => parseItem(i)} style={{ fontSize: 11, color: '#185FA5', background: '#E6F1FB', border: '1px solid #b3d4f5', borderRadius: 6, padding: '0 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}>⚡ Parse</button>}
+                        </div>
+                      </Field>
+                      <Field label="VIN number"><input value={it.vin || ''} onChange={e => setItem(i, { vin: e.target.value })} style={{ fontFamily: 'monospace', fontSize: 11 }} readOnly={!canEdit} /></Field>
+                    </Row>
+                    <Row>
+                      <Field label="Year (specific)"><input value={it.year || ''} onChange={e => setItem(i, { year: e.target.value })} readOnly={!canEdit} placeholder="e.g. 2019" style={{ width: 100 }} /></Field>
+                      <Field label="Quantity"><input type="number" min="1" value={it.quantity || 1} onChange={e => setItem(i, { quantity: parseInt(e.target.value) || 1 })} readOnly={!canEdit} style={{ width: 80 }} /></Field>
+                    </Row>
+                    <Field label="Position (select all that apply)">
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {POSITION_OPTIONS.map(p => (
+                          <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
+                            <input type="checkbox" disabled={!canEdit}
+                              checked={(it.position || []).includes(p)}
+                              onChange={e => { const cur = it.position || []; setItem(i, { position: e.target.checked ? [...cur, p] : cur.filter(x => x !== p) }) }} />
+                            {p}
+                          </label>
+                        ))}
+                      </div>
+                      {(it.position || []).includes('Other') && (
+                        <input value={it.position_other || ''} onChange={e => setItem(i, { position_other: e.target.value })} readOnly={!canEdit} placeholder="Describe other position..." style={{ marginTop: 6, width: '100%' }} />
+                      )}
+                    </Field>
+                    <Row>
+                      <Field label="Material">
+                        <select value={it.material || ''} onChange={e => setItem(i, { material: e.target.value })} disabled={!canEdit}>
+                          <option value="">— select —</option>
+                          {MATERIAL_OPTIONS.map(m => <option key={m}>{m}</option>)}
+                        </select>
+                      </Field>
+                      <Field label="Color + trim code"><input value={it.color || ''} onChange={e => setItem(i, { color: e.target.value })} readOnly={!canEdit} placeholder="e.g. Black 040" /></Field>
+                    </Row>
+                    <Field label="Item production note"><input value={it.item_notes || ''} onChange={e => setItem(i, { item_notes: e.target.value })} readOnly={!canEdit} placeholder="Anything specific to this item" /></Field>
+                  </div>
+                </div>
               </div>
-            </Field>
-          </Row>
+            )
+          })}
+          <Field label="Order production notes">
+            <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 44, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} placeholder="Notes for the whole order" />
+          </Field>
+          <Field label="Ship from Sweden stock">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
+                <input type="checkbox" disabled={!canEdit} checked={form.ship_from_stock || false} onChange={e => setF('ship_from_stock', e.target.checked)} />
+                Use Sweden stock (skips production)
+              </label>
+              {form.ship_from_stock && canEdit && (
+                <button onClick={() => setShowStockPicker(true)} style={{ fontSize: 11, color: '#185FA5', background: '#E6F1FB', border: '1px solid #b3d4f5', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', width: 'fit-content' }}>
+                  📦 Select from inventory
+                </button>
+              )}
+              {form.stock_item && (
+                <div style={{ fontSize: 11, color: '#27a069', background: '#f0faf5', border: '1px solid #9FE1CB', borderRadius: 6, padding: '5px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>✅ {form.stock_item.model} — {form.stock_item.type} — {form.stock_item.colour}</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => setShowStockPicker(true)} style={{ fontSize: 10, color: '#185FA5', background: 'none', border: '1px solid #b3d4f5', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}>Change</button>
+                    <button onClick={() => setF('stock_item', null)} style={{ fontSize: 10, color: '#E24B4A', background: 'none', border: '1px solid #f5b3b3', borderRadius: 4, padding: '2px 6px', cursor: 'pointer' }}>Remove</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Field>
           <SectionLabel>Seat cover photos & VIN images</SectionLabel>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 6 }}>
             {photos.length === 0 && <span style={{ fontSize: 12, color: '#aaa' }}>No photos uploaded yet</span>}
@@ -499,7 +520,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <SectionLabel>Production sheet</SectionLabel>
           <div style={{ border: '1px solid #e0ddd8', borderRadius: 8, padding: 14, fontSize: 12, lineHeight: 1.9, background: '#fafaf9' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, borderBottom: '1px solid #e0ddd8', paddingBottom: 6 }}>Production sheet - {order.order_ref}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, borderBottom: '1px solid #e0ddd8', paddingBottom: 6 }}>Production sheet - {order.order_ref}{multi ? ` — ${items.length} items` : ''}</div>
             {[
               ['Order ID', order.order_ref],
               ['Date', fmtDate(order.order_date || order.created_at)],
@@ -507,23 +528,42 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               ['Phone', order.phone],
               ['Email', order.email],
               ['Address', order.address],
-              ['Car', order.car],
-              ['VIN', order.vin || '-'],
-              ['Position', (order.position || []).join(', ') || '-'],
-              ['Material', order.material || '-'],
-              ['Color / trim', order.color || '-'],
-              ['Quantity', order.quantity || 1],
-              ['Notes', order.notes || '-'],
               ['Status', order.stage],
+              ['Order notes', order.notes || '-'],
             ].map(([k, v]) => (
               <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 2 }}>
                 <span style={{ color: '#888', minWidth: 130 }}>{k}</span>
-                <span style={{ fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</span>
+                <span>{v}</span>
+              </div>
+            ))}
+            {items.map((it, i) => (
+              <div key={i} style={{ border: '1px solid #e0ddd8', borderRadius: 6, padding: 10, marginTop: 10, background: '#fff' }}>
+                {multi && <div style={{ fontWeight: 700, color: '#185FA5', marginBottom: 4 }}>Item {i + 1} of {items.length}</div>}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {itemThumb(it) && <img src={itemThumb(it)} alt="" style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8', flexShrink: 0 }} />}
+                  <div style={{ flex: 1 }}>
+                    {[
+                      ['Car', it.car || it.title || '-'],
+                      ['VIN', it.vin || '-'],
+                      ['Year', it.year || '-'],
+                      ['Position', (it.position || []).concat(it.position_other ? [it.position_other] : []).join(', ') || '-'],
+                      ['Material', it.material || '-'],
+                      ['Color / trim', it.color || '-'],
+                      ['Quantity', it.quantity || 1],
+                      ['Note', it.item_notes || '-'],
+                    ].map(([k, v]) => (
+                      <div key={k} style={{ display: 'flex', gap: 8, marginBottom: 2 }}>
+                        <span style={{ color: '#888', minWidth: 110 }}>{k}</span>
+                        <span style={{ fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
             {(order.photos || []).filter(p => ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()) && p.url).length > 0 && (
               <div style={{ marginTop: 10 }}>
-                <div style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>Photos</div>
+                <div style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>Customer photos</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {order.photos.filter(p => ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()) && p.url).map((p, i) => (
                     <img key={i} src={p.url} alt="" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #e0ddd8' }} />
@@ -539,10 +579,12 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#888', minWidth: 60 }}>Address</span><span>{order.address}</span></div>
             <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#888', minWidth: 60 }}>Phone</span><span>{order.phone}</span></div>
             <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#888', minWidth: 60 }}>Email</span><span>{order.email}</span></div>
-            <div style={{ border: '1px solid #e0ddd8', borderRadius: 6, padding: 10, marginTop: 10, background: '#f5f5f4' }}>
-              <div style={{ fontWeight: 600 }}>{(order.position || []).join(', ')} — {order.material} — {order.color}</div>
-              <div style={{ color: '#888', fontSize: 11 }}>{order.car}</div>
-            </div>
+            {items.map((it, i) => (
+              <div key={i} style={{ border: '1px solid #e0ddd8', borderRadius: 6, padding: 10, marginTop: 10, background: '#f5f5f4' }}>
+                <div style={{ fontWeight: 600 }}>{(it.position || []).join(', ')}{it.material ? ` — ${it.material}` : ''}{it.color ? ` — ${it.color}` : ''}</div>
+                <div style={{ color: '#888', fontSize: 11 }}>{it.car || it.title}{(it.quantity || 1) > 1 ? ` ×${it.quantity}` : ''}</div>
+              </div>
+            ))}
             <div style={{ marginTop: 10, fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, textAlign: 'center', padding: '6px', border: '1px solid #e0ddd8', borderRadius: 4 }}>{order.order_ref}</div>
           </div>
         </div>
@@ -559,11 +601,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       {showStockPicker && (
         <StockPicker
           onClose={() => setShowStockPicker(false)}
-          onSelect={item => {
-            setF('stock_item', item)
-            setF('material', item.type)
-            setF('color', item.colour)
-            setF('car', form.car || item.model)
+          onSelect={stockItem => {
+            setItem(0, { material: stockItem.type, color: stockItem.colour, car: items[0]?.car || stockItem.model })
+            setF('stock_item', stockItem)
             setShowStockPicker(false)
             toast('Stock item selected — quantity will be decremented on save')
           }}

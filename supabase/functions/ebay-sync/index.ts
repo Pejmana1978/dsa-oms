@@ -68,6 +68,33 @@ const COUNTRY_CODES: Record<string, string> = {
   AU: "61", NZ: "64", JP: "81", KR: "82", SG: "65", AE: "971",
 }
 
+// Parse an eBay title into spec fields so each item lands pre-filled for the
+// operator (car / position / material / color). VIN/year stay blank (operator).
+function parseSpec(title: string) {
+  const t = title || ""
+  const yearMatch = t.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
+  const year = yearMatch ? yearMatch[0] : ""
+  const mm = t.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
+  const makeModel = mm ? mm[1].trim() : ""
+  const car = makeModel && year ? `${makeModel} ${year}` : makeModel || t
+  const position: string[] = []
+  if (/driver\s+bottom/i.test(t)) position.push("Driver Bottom")
+  if (/driver\s+top/i.test(t)) position.push("Driver Top")
+  if (/passenger\s+bottom/i.test(t)) position.push("Passenger Bottom")
+  if (/passenger\s+top/i.test(t)) position.push("Passenger Top")
+  let material = ""
+  if (/leather\s+perf/i.test(t)) material = "Leather perf"
+  else if (/leather/i.test(t)) material = "Leather"
+  else if (/vinyl\s+perf/i.test(t)) material = "Vinyl perf"
+  else if (/vinyl/i.test(t)) material = "Vinyl"
+  else if (/alcantara/i.test(t)) material = "Vinyl & Alcantara"
+  else if (/cloth/i.test(t)) material = "Cloth"
+  let color = ""
+  const cm = t.match(/\b(black|grey|gray|beige|brown|red|blue|navy|tan|white|cream|camel|cognac|bordeaux)\b/i)
+  if (cm) color = cm[1].charAt(0).toUpperCase() + cm[1].slice(1).toLowerCase()
+  return { car, position, material, color }
+}
+
 function formatPhone(phone: string, countryCode = "") {
   if (!phone) return ""
   const cleaned = phone.replace(/[\s\-().+]/g, "")
@@ -125,6 +152,7 @@ serve(async () => {
         const liId = li.legacyItemId || ""
         const liSku = li.sku || liId || ""
         const liThumb = i === 0 ? thumbnail : (liId ? await getThumbnail(liId, liSku) : "")
+        const spec = parseSpec(li.title || "")
         itemsDetail.push({
           title: li.title || "",
           quantity: Number(li.quantity) || 1,
@@ -133,6 +161,15 @@ serve(async () => {
           item_id: liId,
           sku: li.sku || "",
           thumbnail: liThumb,
+          custom_thumbnail: "",
+          car: spec.car,
+          vin: "",
+          year: "",
+          position: spec.position,
+          position_other: "",
+          material: spec.material,
+          color: spec.color,
+          item_notes: "",
         })
       }
       const totalQuantity = items.reduce((n: number, li: any) => n + (Number(li.quantity) || 0), 0) || 1
