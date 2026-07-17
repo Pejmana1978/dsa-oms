@@ -5,6 +5,7 @@ import { STAGES } from '../lib/constants'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { getOrderItems, isMultiItem } from '../lib/orderItems'
 
 export default function ProductionPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
@@ -39,22 +40,48 @@ export default function ProductionPage({ orders, setOrders, role }) {
   }
 
   function buildSheetHTML(o) {
+    const items = getOrderItems(o)
+    const multi = items.length > 1
     const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
     const positions = (o.position || []).join(' & ') || '—'
     const isMultiPos = (o.position||[]).length > 1
     const photosRow = customerPhotos.length > 0 ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' + customerPhotos.map(p => '<img src="' + p.url + '" style="height:120px;max-width:160px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" loading="lazy"  />').join('') + '</div>' : ''
-    const thumbImg = o.thumbnail ? '<img src="' + o.thumbnail.replace('s-l1600', 's-l500') + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />' : ''
     const notesHtml = o.notes ? '<div style="font-size:11px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:3px 7px;margin-top:6px;display:inline-block">' + o.notes + '</div>' : ''
     const lastCol = (o.vin ? '<div style="font-size:10px;font-family:monospace;color:#555;margin-bottom:4px">VIN: ' + o.vin + '</div>' : '') +
       (o.year ? '<div style="font-size:11px;color:#555;margin-bottom:6px">Year: ' + o.year + '</div>' : '') +
       notesHtml
-    return '<div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:16px;page-break-inside:avoid">' +
-      '<table style="width:100%;border-collapse:collapse"><tr>' +
-      '<td style="width:22%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;line-height:1.3">' + o.car + '</div><div style="font-size:11px;color:#666;margin-top:3px">Order: ' + o.order_ref + '</div></td>' +
-      '<td style="width:28%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;color:' + (isMultiPos ? '#d97706' : '#000') + '">' + positions + '</div><div style="font-size:13px;margin-top:3px">' + (o.material || '—') + '</div><div style="font-size:13px;color:#333">' + (o.color || '—') + '</div></td>' +
-      '<td style="width:8%;vertical-align:top;text-align:center"><div style="font-size:48px;font-weight:bold;line-height:1">' + (o.quantity || 1) + '</div></td>' +
-      '<td style="width:16%;vertical-align:top;padding:0 10px">' + thumbImg + '</td>' +
-      '<td style="width:26%;vertical-align:top">' + lastCol + '</td>' +
+    const sharedCol = '<div style="font-size:15px;font-weight:bold;color:' + (isMultiPos ? '#d97706' : '#000') + '">' + positions + '</div><div style="font-size:13px;margin-top:3px">' + (o.material || '—') + '</div><div style="font-size:13px;color:#333">' + (o.color || '—') + '</div>'
+    const itemThumb = (t) => t ? '<img src="' + t.replace('s-l1600', 's-l500') + '" style="height:90px;max-width:110px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />' : ''
+
+    if (!multi) {
+      return '<div style="border:1px solid #ccc;border-radius:6px;padding:14px;margin-bottom:16px;page-break-inside:avoid">' +
+        '<table style="width:100%;border-collapse:collapse"><tr>' +
+        '<td style="width:22%;vertical-align:top;padding-right:10px"><div style="font-size:15px;font-weight:bold;line-height:1.3">' + o.car + '</div><div style="font-size:11px;color:#666;margin-top:3px">Order: ' + o.order_ref + '</div></td>' +
+        '<td style="width:28%;vertical-align:top;padding-right:10px">' + sharedCol + '</td>' +
+        '<td style="width:8%;vertical-align:top;text-align:center"><div style="font-size:48px;font-weight:bold;line-height:1">' + (o.quantity || 1) + '</div></td>' +
+        '<td style="width:16%;vertical-align:top;padding:0 10px">' + itemThumb(o.thumbnail) + '</td>' +
+        '<td style="width:26%;vertical-align:top">' + lastCol + '</td>' +
+        '</tr></table>' +
+        photosRow +
+        '</div>'
+    }
+
+    // MULTI-ITEM ORDER: banner + one block per item (title, qty, thumbnail),
+    // then the shared attributes + notes. Never show prices on production sheets.
+    const itemRows = items.map((it, i) =>
+      '<table style="width:100%;border-collapse:collapse;border-top:' + (i === 0 ? 'none' : '1px dashed #bbb') + '"><tr>' +
+      '<td style="width:50%;vertical-align:top;padding:8px 10px 8px 0"><div style="font-size:14px;font-weight:bold;line-height:1.3">' + (i + 1) + '. ' + (it.title || '—') + '</div>' + (it.item_id ? '<div style="font-size:10px;color:#888;margin-top:2px">Item: ' + it.item_id + (it.sku ? ' · SKU ' + it.sku : '') + '</div>' : '') + '</td>' +
+      '<td style="width:12%;vertical-align:middle;text-align:center"><div style="font-size:40px;font-weight:bold;line-height:1">' + (it.quantity || 1) + '</div><div style="font-size:9px;color:#888">QTY</div></td>' +
+      '<td style="width:38%;vertical-align:top;padding:6px 0">' + itemThumb(it.thumbnail) + '</td>' +
+      '</tr></table>'
+    ).join('')
+    return '<div style="border:2px solid #d97706;border-radius:6px;padding:14px;margin-bottom:16px;page-break-inside:avoid">' +
+      '<div style="background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:5px 10px;margin-bottom:8px;font-size:13px;font-weight:bold;color:#92400E">⚠ MULTI-ITEM ORDER — ' + items.length + ' ITEMS, produce ALL of them</div>' +
+      '<div style="font-size:11px;color:#666;margin-bottom:6px">Order: ' + o.order_ref + '</div>' +
+      itemRows +
+      '<table style="width:100%;border-collapse:collapse;border-top:2px solid #000;margin-top:6px"><tr>' +
+      '<td style="width:40%;vertical-align:top;padding-top:8px">' + sharedCol + '</td>' +
+      '<td style="width:60%;vertical-align:top;padding-top:8px">' + lastCol + '</td>' +
       '</tr></table>' +
       photosRow +
       '</div>'
@@ -254,10 +281,14 @@ export default function ProductionPage({ orders, setOrders, role }) {
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            {o.thumbnail && (
+            {getOrderItems(o).some(it => it.thumbnail) && (
               <div>
-                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>eBay listing</div>
-                <img src={o.thumbnail} alt="eBay" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>{isMultiItem(o) ? `eBay listings (${o.items.length} items)` : 'eBay listing'}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {getOrderItems(o).map((it, i) => it.thumbnail && (
+                    <img key={i} src={it.thumbnail} alt="eBay" title={it.title} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                  ))}
+                </div>
               </div>
             )}
             {(o.photos || []).filter(p => {

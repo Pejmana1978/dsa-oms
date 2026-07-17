@@ -96,7 +96,8 @@ serve(async () => {
       const { data: existing } = await supabase.from("orders").select("id").eq("order_ref", ref).single()
       if (existing) continue
       const buyer = order.buyer || {}
-      const item = order.lineItems?.[0] || {}
+      const items = order.lineItems || []
+      const item = items[0] || {}
       const fulfillment = order.fulfillmentStartInstructions?.[0] || {}
       const shipTo = fulfillment.shippingStep?.shipTo || {}
       const contactAddr = shipTo.contactAddress || {}
@@ -114,27 +115,60 @@ serve(async () => {
       const legacyItemId = item.legacyItemId || ""
       const sku = item.sku || legacyItemId || ""
       const thumbnail = legacyItemId ? await getThumbnail(legacyItemId, sku) : ""
-      const price = item.lineItemCost?.value ? `${item.lineItemCost.value} ${item.lineItemCost.currency}` : ""
       const buyerUsername = buyer.username || ""
-      const notes = ""  // Buyer/SKU/Price shown in top info box
+      // Multi-item orders: one OMS row per eBay order, so aggregate ALL line
+      // items (previously only lineItems[0] was imported — items got dropped).
+      // Full per-item detail (incl. per-item thumbnails) goes into `items`.
+      const itemsDetail: any[] = []
+      for (let i = 0; i < items.length; i++) {
+        const li = items[i]
+        const liId = li.legacyItemId || ""
+        const liSku = li.sku || liId || ""
+        const liThumb = i === 0 ? thumbnail : (liId ? await getThumbnail(liId, liSku) : "")
+        itemsDetail.push({
+          title: li.title || "",
+          quantity: Number(li.quantity) || 1,
+          price: li.lineItemCost?.value ? parseFloat(li.lineItemCost.value) : null,
+          currency: li.lineItemCost?.currency || null,
+          item_id: liId,
+          sku: li.sku || "",
+          thumbnail: liThumb,
+        })
+      }
+      const totalQuantity = items.reduce((n: number, li: any) => n + (Number(li.quantity) || 0), 0) || 1
+      const itemsCostSum = items.reduce((s: number, li: any) => s + (parseFloat(li.lineItemCost?.value || "0") || 0), 0)
+      const orderTotal = order.pricingSummary?.total?.value
+        ? parseFloat(order.pricingSummary.total.value)
+        : (itemsCostSum || null)
+      const orderCurrency = order.pricingSummary?.total?.currency || item.lineItemCost?.currency || null
+      const car = items.length > 1
+        ? `${item.title || "See eBay order"} [+${items.length - 1} more — see notes]`
+        : (item.title || "See eBay order")
+      const notes = items.length > 1
+        ? `MULTI-ITEM ORDER — ${items.length} items:\n` + items.map((li: any, i: number) =>
+            `${i + 1}. ${li.title || "?"} — qty ${li.quantity || 1} @ ${li.lineItemCost?.value || "?"} ${li.lineItemCost?.currency || ""} (item ${li.legacyItemId || "?"}${li.sku ? `, SKU ${li.sku}` : ""})`
+          ).join("\n")
+        : ""
       const { error } = await supabase.from("orders").insert({
         order_ref: ref,
         customer_name: shipTo.fullName || buyerUsername || "eBay Customer",
         email: buyer.email || shipTo.email || "",
         phone: phone,
         address: address,
-        car: item.title || "See eBay order",
+        car: car,
         seats: "Full set (5)",
+        quantity: totalQuantity,
         color: "",
         source: "eBay",
         stage: "New",
         notes: notes,
         thumbnail: thumbnail,
         ebay_item_id: legacyItemId,
-        sale_amount: item.lineItemCost?.value ? parseFloat(item.lineItemCost.value) : null,
-        sale_currency: item.lineItemCost?.currency || null,
+        sale_amount: orderTotal,
+        sale_currency: orderCurrency,
         order_date: order.creationDate ? order.creationDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
         photos: [],
+        items: itemsDetail,
       })
       if (!error) imported++
     }

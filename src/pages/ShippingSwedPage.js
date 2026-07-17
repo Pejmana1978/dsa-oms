@@ -5,6 +5,7 @@ import { updateOrder } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { getOrderItems, isMultiItem } from '../lib/orderItems'
 
 export default function ShippingSwedPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
@@ -161,10 +162,14 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            {o.thumbnail && (
+            {getOrderItems(o).some(it => it.thumbnail) && (
               <div>
-                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>eBay listing</div>
-                <img src={o.thumbnail} alt="eBay" style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 3 }}>{isMultiItem(o) ? `eBay listings (${o.items.length} items)` : 'eBay listing'}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {getOrderItems(o).map((it, i) => it.thumbnail && (
+                    <img key={i} src={it.thumbnail} alt="eBay" title={it.title} style={{ width: 70, height: 70, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8' }} />
+                  ))}
+                </div>
               </div>
             )}
             {(o.photos || []).filter(p => {

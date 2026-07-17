@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
 import { supabase } from '../lib/supabase'
+import { getOrderItems, isMultiItem } from '../lib/orderItems'
 
 export default function OrdersPage({ orders, setOrders, role }) {
   const [q, setQ] = useState('')
@@ -148,9 +149,24 @@ export default function OrdersPage({ orders, setOrders, role }) {
                   <div style={{ fontSize: 12 }}>{o.customer_name}</div>
                 </td>
 
-                <td style={{ padding: '4px 6px' }}>{o.thumbnail ? <img src={o.thumbnail} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} /> : <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />}</td>
+                <td style={{ padding: '4px 6px' }}>
+                  {(() => {
+                    const items = getOrderItems(o)
+                    const thumbs = items.map(it => it.thumbnail).filter(Boolean)
+                    if (thumbs.length === 0) return <div style={{ width: 36, height: 36, borderRadius: 4, background: '#f0ede8' }} />
+                    if (thumbs.length === 1) return <img src={thumbs[0]} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4 }} />
+                    return (
+                      <div style={{ position: 'relative', width: 48, height: 40 }}>
+                        <img src={thumbs[0]} alt="" style={{ position: 'absolute', left: 0, top: 0, width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #fff', zIndex: 2 }} />
+                        <img src={thumbs[1]} alt="" style={{ position: 'absolute', left: 14, top: 7, width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #fff', zIndex: 1 }} />
+                        {items.length > 2 && <span style={{ position: 'absolute', right: -4, bottom: -4, background: '#185FA5', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 5px', zIndex: 3 }}>+{items.length - 2}</span>}
+                      </div>
+                    )
+                  })()}
+                </td>
                 <td style={{ padding: '9px 11px' }}>
                   <div style={{ fontSize: 12 }}>{o.car}</div>
+                  {isMultiItem(o) && <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706' }}>⚠ {o.items.length} items in this order</div>}
                   <div style={{ fontSize: 10, color: '#aaa' }}>{o.color}</div>
                   {o.ebay_item_id && <a href={'https://www.ebay.co.uk/itm/' + o.ebay_item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
                   {o.source === 'eBay' && o.order_ref && <a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + o.order_ref} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View order →</a>}

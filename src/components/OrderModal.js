@@ -6,6 +6,7 @@ import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
 import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
 import { useToast } from './Toast'
+import { getOrderItems, isMultiItem } from '../lib/orderItems'
 const TABS = ['Details', 'Email / SMS', 'Print / Export']
 function Field({ label, children }) {
   return (
@@ -278,6 +279,29 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               {order.source === 'eBay' && order.order_ref && <div style={{ marginTop: 2 }}><a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + order.order_ref} target='_blank' rel='noreferrer' style={{ fontSize: 11, color: '#185FA5', textDecoration: 'none' }}>View eBay order →</a></div>}
             </div>
           </div>
+          {isMultiItem(order) && (
+            <div style={{ background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 8, padding: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#92400E', marginBottom: 8 }}>⚠ MULTI-ITEM ORDER — {order.items.length} items, ALL must be produced & shipped together</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {getOrderItems(order).map((it, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', background: '#fff', borderRadius: 6, padding: 8, border: '1px solid #eee' }}>
+                    {it.thumbnail
+                      ? <img src={it.thumbnail} alt="" style={{ width: 54, height: 54, objectFit: 'cover', borderRadius: 4, border: '1px solid #e0ddd8', flexShrink: 0 }} />
+                      : <div style={{ width: 54, height: 54, borderRadius: 4, background: '#f0ede8', flexShrink: 0 }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600 }}>{i + 1}. {it.title}</div>
+                      <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                        Qty {it.quantity || 1}
+                        {it.price != null ? ` · ${it.currency || ''} ${Number(it.price).toFixed(2)}` : ''}
+                        {it.sku ? ` · SKU ${it.sku}` : ''}
+                      </div>
+                      {it.item_id && <a href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <Field label="Production notes">
             <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 50, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} />
           </Field>
