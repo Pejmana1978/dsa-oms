@@ -181,11 +181,7 @@ serve(async () => {
       const car = items.length > 1
         ? `${item.title || "See eBay order"} [+${items.length - 1} more — see notes]`
         : (item.title || "See eBay order")
-      const notes = items.length > 1
-        ? `MULTI-ITEM ORDER — ${items.length} items:\n` + items.map((li: any, i: number) =>
-            `${i + 1}. ${li.title || "?"} — qty ${li.quantity || 1} @ ${li.lineItemCost?.value || "?"} ${li.lineItemCost?.currency || ""} (item ${li.legacyItemId || "?"}${li.sku ? `, SKU ${li.sku}` : ""})`
-          ).join("\n")
-        : ""
+      const notes = ""  // per-item detail lives in items[]; order notes are operator-owned
       const { error } = await supabase.from("orders").insert({
         order_ref: ref,
         customer_name: shipTo.fullName || buyerUsername || "eBay Customer",

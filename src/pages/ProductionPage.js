@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { StageBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { STAGES } from '../lib/constants'
 import { updateOrder } from '../lib/api'
@@ -205,7 +204,6 @@ export default function ProductionPage({ orders, setOrders, role }) {
               <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.stage}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <StageBadge stage={o.stage} />
               <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>
               <Btn size="sm" onClick={() => printSheet(o)}>Print sheet</Btn>
 

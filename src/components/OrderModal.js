@@ -366,9 +366,11 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               </div>
             )
           })}
-          <Field label="Order production notes">
-            <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 44, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} placeholder="Notes for the whole order" />
-          </Field>
+          {(!multi || form.notes) && (
+            <Field label="Order production notes">
+              <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 44, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} placeholder="Notes for the whole order" />
+            </Field>
+          )}
           <Field label="Ship from Sweden stock">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
