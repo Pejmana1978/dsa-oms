@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [navNewOrders, setNavNewOrders] = useState(false)
   const toast = useToast()
   const role = profile?.role || 'sales'
   const pages = ROLE_PAGES[role] || ['orders']
@@ -100,10 +101,10 @@ export default function Dashboard() {
           <div style={{ fontSize: 10, color: '#bbb', padding: '8px 8px 3px', letterSpacing: '.06em', textTransform: 'uppercase' }}>Navigation</div>
           {pages.map(p => {
             const badge = getBadge(p)
-            const isActive = activePage === p
+            const isActive = activePage === p && !(p === 'orders' && navNewOrders)
             return (
               <React.Fragment key={p}>
-              <div onClick={() => setPage(p)} style={{
+              <div onClick={() => { setPage(p); setNavNewOrders(false); if (p === 'orders') setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'All' })), 100) }} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
                 color: isActive ? '#1a1a1a' : '#888', fontWeight: isActive ? 600 : 400,
@@ -118,14 +119,16 @@ export default function Dashboard() {
                 {badge && <span style={{ background: '#E24B4A', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{badge}</span>}
               </div>
               {p === 'orders' && (
-                <div onClick={() => { setPage('orders'); setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'New' })), 100) }}
+                <div onClick={() => { setPage('orders'); setNavNewOrders(true); setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'New' })), 100) }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-                    color: '#888', fontWeight: 400, background: 'transparent'
+                    color: (activePage === 'orders' && navNewOrders) ? '#1a1a1a' : '#888',
+                    fontWeight: (activePage === 'orders' && navNewOrders) ? 600 : 400,
+                    background: (activePage === 'orders' && navNewOrders) ? '#f5f5f4' : 'transparent'
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9f9f8'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  onMouseEnter={e => { if (!(activePage === 'orders' && navNewOrders)) e.currentTarget.style.background = '#f9f9f8' }}
+                  onMouseLeave={e => { if (!(activePage === 'orders' && navNewOrders)) e.currentTarget.style.background = 'transparent' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 9V5l3 4V5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10" cy="7" r="0.9" fill="currentColor"/></svg>
                     New orders
