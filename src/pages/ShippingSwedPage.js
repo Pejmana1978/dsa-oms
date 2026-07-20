@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { StageBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
@@ -7,7 +6,7 @@ import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
 
-export default function ShippingSwedPage({ orders, setOrders, role }) {
+export default function ShippingSwedPage({ orders, setOrders, role, mode = 'sweden' }) {
   const [selected, setSelected] = useState(null)
   const [labelLoading, setLabelLoading] = useState({})
   const [deliveryStatus, setDeliveryStatus] = useState({})
@@ -15,7 +14,8 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
   const toast = useToast()
 
   const queue = orders.filter(o => {
-    if (!['Shipped to Sweden', 'Shipped to Customer', 'Delivered'].includes(o.stage)) return false
+    if (mode === 'sweden') return o.stage === 'Shipped to Sweden'
+    if (!['Shipped to Customer', 'Delivered'].includes(o.stage)) return false
     if (!showDelivered && o.stage === 'Delivered') return false
     return true
   })
@@ -96,15 +96,17 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: '#888' }}>{queue.length} order{queue.length !== 1 ? 's' : ''} in Sweden shipping pipeline</span>
-        <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-          <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
-          Show delivered
-        </label>
+        <span style={{ fontSize: 12, color: '#888' }}>{queue.length} order{queue.length !== 1 ? 's' : ''} {mode === 'sweden' ? 'in transit to Sweden warehouse' : 'shipped to customers'}</span>
+        {mode === 'customer' && (
+          <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
+            Show delivered
+          </label>
+        )}
       </div>
       {queue.length === 0 && (
         <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: 32, textAlign: 'center', fontSize: 12, color: '#bbb' }}>
-          No orders in Sweden shipping pipeline
+          {mode === 'sweden' ? 'No orders in transit to Sweden' : 'No orders shipped to customers'}
         </div>
       )}
       {queue.map(o => (
@@ -122,7 +124,7 @@ export default function ShippingSwedPage({ orders, setOrders, role }) {
               <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{o.customer_name} — {o.address}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <StageBadge stage={o.stage} />
+              {o.stage === 'Delivered' && <span style={{ fontSize: 10, fontWeight: 600, background: '#F1EFE8', color: '#444441', borderRadius: 4, padding: '2px 7px' }}>Delivered</span>}
               {o.stage === 'Shipped to Sweden' && (
                 <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>
                   {labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}

@@ -21,6 +21,7 @@ const NAV_ICONS = {
   shipping: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/></svg>,
   stats: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="7" width="3" height="6" rx="1" fill="currentColor" opacity=".6"/><rect x="5.5" y="4" width="3" height="9" rx="1" fill="currentColor" opacity=".8"/><rect x="10" y="1" width="3" height="12" rx="1" fill="currentColor"/></svg>,
   users: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="4.5" r="2" stroke="currentColor" strokeWidth="1.2"/><path d="M1 12c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M9.5 3c1.1 0 2 .9 2 2s-.9 2-2 2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/><path d="M11.5 10c1 .5 1.5 1.3 1.5 2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>,
+  shipping_customer: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l5-4.5L12 7v5a1 1 0 01-1 1H3a1 1 0 01-1-1V7z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M5.5 13V9.5h3V13" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>,
   stock: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M4 7h6M7 4v6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   archive: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1 6h12" stroke="currentColor" strokeWidth="1.2"/><path d="M5 8.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
   shipping_us: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="4" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 6h1.5l1.5 2v3h-3V6z" stroke="currentColor" strokeWidth="1.2"/><circle cx="3.5" cy="11.5" r="1" fill="currentColor"/><circle cx="10.5" cy="11.5" r="1" fill="currentColor"/><text x="4" y="9" fontSize="4" fill="currentColor">US</text></svg>,
@@ -57,11 +58,13 @@ export default function Dashboard() {
   const prodCount = active.filter(o => o.stage === 'In Production').length
   const shipUSCount = active.filter(o => o.stage === 'Production Complete').length
   const shipSwedCount = active.filter(o => o.stage === 'Shipped to Sweden').length
+  const shipCustCount = active.filter(o => o.stage === 'Shipped to Customer').length
   function getBadge(p) {
     if (p === 'verified' && verifiedCount > 0) return verifiedCount
     if (p === 'production' && prodCount > 0) return prodCount
     if (p === 'shipping_us' && shipUSCount > 0) return shipUSCount
     if (p === 'shipping_sweden' && shipSwedCount > 0) return shipSwedCount
+    if (p === 'shipping_customer' && shipCustCount > 0) return shipCustCount
     return null
   }
   const activePage = page && pages.includes(page) ? page : pages[0]
@@ -151,7 +154,8 @@ export default function Dashboard() {
                 {activePage === 'production' && <ProductionPage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'shipping' && <ShippingPage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
-                {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} mode="sweden" />}
+                {activePage === 'shipping_customer' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} mode="customer" />}
                 {activePage === 'stock' && <StockPage />}
                 {activePage === 'archive' && <ArchivePage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'stats' && <StatsPage orders={orders} />}

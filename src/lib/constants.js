@@ -8,11 +8,11 @@ export const STAGES = [
   'Delivered'
 ]
 export const ROLE_PAGES = {
-  admin:           ['orders', 'verified', 'production', 'shipping_us', 'shipping_sweden', 'stock', 'stats', 'archive', 'users', 'customer_service'],
+  admin:           ['orders', 'verified', 'production', 'shipping_us', 'shipping_sweden', 'shipping_customer', 'stock', 'stats', 'archive', 'users', 'customer_service'],
   sales:           ['orders', 'stats', 'archive', 'customer_service'],
   production:      ['production'],
   shipping_us:     ['shipping_us'],
-  shipping_sweden: ['shipping_sweden'],
+  shipping_sweden: ['shipping_sweden', 'shipping_customer'],
 }
 export const PAGE_LABELS = {
   orders:           'All orders',
@@ -20,6 +20,7 @@ export const PAGE_LABELS = {
   production:       'Production queue',
   shipping_us:      'Shipping (USA)',
   shipping_sweden:  'Shipping (Sweden)',
+  shipping_customer: 'Shipping (Customer)',
   stock:            'Sweden stock',
   archive:          'Archive',
   stats:            'Overview',
