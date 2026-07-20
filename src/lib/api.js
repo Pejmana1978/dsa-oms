@@ -1,5 +1,12 @@
 import { supabase } from './supabase'
 
+// The /api/* Vercel routes require a signed-in user — send the session token.
+export async function authHeaders() {
+  const { data } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  return token ? { Authorization: 'Bearer ' + token } : {}
+}
+
 export async function fetchOrders() {
   const { data, error } = await supabase
     .from('orders')
@@ -56,10 +63,13 @@ export async function fetchProfiles() {
 }
 
 export async function inviteUser(email, fullName, role) {
-  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName, role }
+  const res = await fetch('/api/invite-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ email, fullName, role })
   })
-  if (error) throw error
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Invite failed')
   return data
 }
 
@@ -75,10 +85,17 @@ export async function fetchStock() {
   return data
 }
 
-export async function decrementStock(id) {
-  const { data: item } = await supabase.from('stock').select('quantity').eq('id', id).single()
-  if (!item || item.quantity <= 0) throw new Error('Item out of stock')
-  const { data, error } = await supabase.from('stock').update({ quantity: item.quantity - 1 }).eq('id', id).select().single()
+// Atomic in the database (single conditional UPDATE) — two users can't both
+// take the last unit, and cancelling a pick returns the unit.
+export async function takeStock(id) {
+  const { data, error } = await supabase.rpc('take_stock', { stock_id: id })
   if (error) throw error
-  return data
+  if (!data || data.length === 0) throw new Error('Item out of stock')
+  return data[0]
+}
+
+export async function returnStock(id) {
+  const { data, error } = await supabase.rpc('return_stock', { stock_id: id })
+  if (error) throw error
+  return data?.[0]
 }

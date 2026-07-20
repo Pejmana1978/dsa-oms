@@ -23,16 +23,19 @@ serve(async (req) => {
     const { orderId, trackingNumber } = await req.json()
     const token = await getToken()
 
-    // First fetch the order to get the lineItemId
+    // Fetch the order and fulfill EVERY line item — everything ships in one
+    // parcel, and fulfilling only lineItems[0] left the rest of a multi-item
+    // order stuck as "awaiting shipment" on eBay forever.
     const orderRes = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order/${orderId}`, {
       headers: { "Authorization": `Bearer ${token}` }
     })
     const orderData = await orderRes.json()
-    console.log('orderData:', JSON.stringify(orderData))
-    const lineItemId = orderData.lineItems?.[0]?.lineItemId
+    const lineItems = (orderData.lineItems || [])
+      .map((li: any) => ({ lineItemId: li.lineItemId, quantity: Number(li.quantity) || 1 }))
+      .filter((li: any) => li.lineItemId)
 
-    if (!lineItemId) {
-      return new Response(JSON.stringify({ error: 'Could not find lineItemId', orderKeys: Object.keys(orderData) }), { status: 400 })
+    if (lineItems.length === 0) {
+      return new Response(JSON.stringify({ error: 'Could not find any lineItemId', orderKeys: Object.keys(orderData) }), { status: 400 })
     }
 
     const res = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order/${orderId}/shipping_fulfillment`, {
@@ -42,7 +45,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        lineItems: [{ lineItemId: lineItemId }],
+        lineItems: lineItems,
         shippingCarrierCode: "UPS",
         trackingNumber: trackingNumber,
         shippedDate: new Date().toISOString(),

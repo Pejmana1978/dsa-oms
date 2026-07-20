@@ -72,9 +72,9 @@ const COUNTRY_CODES: Record<string, string> = {
 // operator (car / position / material / color). VIN/year stay blank (operator).
 function parseSpec(title: string) {
   const t = title || ""
-  const yearMatch = t.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
+  const yearMatch = t.match(/\b((?:19|20)\d{2})(?:[\-–]((?:19|20)\d{2}))?\b/)
   const year = yearMatch ? yearMatch[0] : ""
-  const mm = t.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
+  const mm = t.match(/(?:For\s+)?(?:(?:19|20)\d{2}[\-–](?:19|20)\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
   const makeModel = mm ? mm[1].trim() : ""
   const car = makeModel && year ? `${makeModel} ${year}` : makeModel || t
   const position: string[] = []
@@ -112,11 +112,19 @@ serve(async () => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     const token = await getEbayToken()
-    const res = await fetch("https://api.ebay.com/sell/fulfillment/v1/order?limit=50", {
-      headers: { "Authorization": `Bearer ${token}` },
-    })
-    const ebayData = await res.json()
-    const ebayOrders = ebayData.orders || []
+    // Paginate through ALL orders in eBay's return window — a single
+    // limit=50 call silently dropped older un-imported orders (and hid
+    // refunds/cancellations) once volume passed 50.
+    const ebayOrders: any[] = []
+    for (let offset = 0; offset < 1000; offset += 100) {
+      const res = await fetch(`https://api.ebay.com/sell/fulfillment/v1/order?limit=100&offset=${offset}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      })
+      const page = await res.json()
+      const batch = page.orders || []
+      ebayOrders.push(...batch)
+      if (batch.length < 100) break
+    }
     let imported = 0
     for (const order of ebayOrders) {
       const ref = order.orderId
@@ -178,8 +186,11 @@ serve(async () => {
         ? parseFloat(order.pricingSummary.total.value)
         : (itemsCostSum || null)
       const orderCurrency = order.pricingSummary?.total?.currency || item.lineItemCost?.currency || null
+      const shippingCost = order.pricingSummary?.deliveryCost?.value
+        ? parseFloat(order.pricingSummary.deliveryCost.value)
+        : null
       const car = items.length > 1
-        ? `${item.title || "See eBay order"} [+${items.length - 1} more — see notes]`
+        ? `${item.title || "See eBay order"} [+${items.length - 1} more]`
         : (item.title || "See eBay order")
       const notes = ""  // per-item detail lives in items[]; order notes are operator-owned
       const { error } = await supabase.from("orders").insert({
@@ -199,6 +210,7 @@ serve(async () => {
         ebay_item_id: legacyItemId,
         sale_amount: orderTotal,
         sale_currency: orderCurrency,
+        shipping_cost: shippingCost,
         order_date: order.creationDate ? order.creationDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
         photos: [],
         items: itemsDetail,
@@ -208,7 +220,7 @@ serve(async () => {
     // Check existing eBay orders for cancellations and refunds
     const { data: existingOrders } = await supabase
       .from("orders")
-      .select("id, order_ref, archived, refund_amount")
+      .select("id, order_ref, archived, refund_amount, sale_amount")
       .eq("source", "eBay")
       .eq("archived", false)
 
@@ -220,11 +232,13 @@ serve(async () => {
       const existing = existingOrders?.find(o => o.order_ref === ref)
       if (!existing) continue
 
-      // Check for cancellation - archive if cancelled regardless of refund state
-      const isCancelled = ebayOrder.cancelStatus?.cancelState === 'CANCEL_COMPLETE' ||
-        ebayOrder.orderFulfillmentStatus === 'NOT_STARTED' && (ebayOrder.cancelStatus?.cancelRequests?.length > 0)
-      if (isCancelled) {
-        await supabase.from("orders").update({ archived: true, refund_note: 'Cancelled on eBay', refund_amount: ebayOrder.pricingSummary?.total?.value ? parseFloat(ebayOrder.pricingSummary.total.value) : 0 }).eq("id", existing.id)
+      // Archive only COMPLETED cancellations. A buyer merely REQUESTING
+      // cancellation must not archive the order or fabricate a refund —
+      // the seller may decline the request.
+      if (ebayOrder.cancelStatus?.cancelState === 'CANCEL_COMPLETE') {
+        const refundedSum = ebayOrder.paymentSummary?.refunds?.reduce((sum: number, r: any) => sum + parseFloat(r.amount?.value || 0), 0) || 0
+        const fallbackTotal = ebayOrder.pricingSummary?.total?.value ? parseFloat(ebayOrder.pricingSummary.total.value) : 0
+        await supabase.from("orders").update({ archived: true, refund_note: 'Cancelled on eBay', refund_amount: refundedSum || fallbackTotal }).eq("id", existing.id)
         cancelled++
         continue
       }

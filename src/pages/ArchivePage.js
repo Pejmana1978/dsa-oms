@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import OrderModal from '../components/OrderModal'
+import { getOrderItems } from '../lib/orderItems'
 
 export default function ArchivePage({ orders, setOrders, role }) {
   const [q, setQ] = useState('')
@@ -10,7 +11,10 @@ export default function ArchivePage({ orders, setOrders, role }) {
       if (!o.archived) return false
       if (q) {
         const qs = q.toLowerCase()
-        if (!`${o.order_ref}${o.customer_name}${o.car}${o.notes || ''}`.toLowerCase().includes(qs)) return false
+        const hay = [o.order_ref, o.customer_name, o.car, o.vin, o.notes,
+          ...getOrderItems(o).flatMap(it => [it.title, it.car, it.vin, it.sku, it.color])]
+          .filter(Boolean).join(' ').toLowerCase()
+        if (!hay.includes(qs)) return false
       }
       return true
     })
@@ -61,10 +65,17 @@ export default function ArchivePage({ orders, setOrders, role }) {
                     <div style={{ fontSize: 10, color: '#aaa' }}>{o.phone}</div>
                   </td>
                   <td style={{ padding: '9px 11px' }}>
-                    <div style={{ fontSize: 12 }}>{o.car}</div>
-                    <div style={{ fontSize: 10, color: '#aaa' }}>{(o.position || []).join(', ')}</div>
+                    {(() => {
+                      const its = getOrderItems(o)
+                      return <>
+                        <div style={{ fontSize: 12 }}>{its[0].car || its[0].title || o.car}</div>
+                        {its.length > 1
+                          ? <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706' }}>⚠ {its.length} items in this order</div>
+                          : <div style={{ fontSize: 10, color: '#aaa' }}>{(its[0].position || []).join(', ')}</div>}
+                      </>
+                    })()}
                   </td>
-                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{o.color || '—'}</td>
+                  <td style={{ padding: '9px 11px', fontSize: 12 }}>{getOrderItems(o).map(it => it.color).filter(Boolean).join(' / ') || '—'}</td>
                   <td style={{ padding: '9px 11px', fontSize: 11, color: '#27a069' }}>
                     {o.delivered_at ? o.delivered_at.slice(0,10).split('-').reverse().join('/') : '—'}
                   </td>

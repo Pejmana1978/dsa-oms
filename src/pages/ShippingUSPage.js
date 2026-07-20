@@ -49,18 +49,21 @@ export default function ShippingUSPage({ orders, setOrders, role }) {
               <Btn size="sm" variant="primary" onClick={() => advance(o.id)}>Mark Shipped</Btn>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
-            {[
-              ['Car', o.car],
-              ['Position', (o.position || []).join(', ') || '—'],
-              ['Material', o.material || '—'],
-              ['Color / Trim', o.color || '—'],
-              ['Quantity', o.quantity || 1],
-              ['VIN', o.vin || '—'],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+            {getOrderItems(o).map((it, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 0.5fr', gap: 10, borderTop: i > 0 ? '1px dashed #e0ddd8' : 'none', paddingTop: i > 0 ? 8 : 0 }}>
+                {[
+                  ['Car / position', `${it.car || it.title || '—'}${(it.position || []).length ? ' · ' + (it.position || []).join(', ') : ''}`],
+                  ['Material', it.material || '—'],
+                  ['Color / Trim', it.color || '—'],
+                  ['VIN', it.vin || '—'],
+                  ['Qty', it.quantity || 1],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

@@ -1,0 +1,16 @@
+{
+  "name": "cs-database-import",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Historical data import scripts for DSA Customer Service Database",
+  "scripts": {
+    "import:whatsapp": "node --env-file=.env 02_parse_whatsapp.js",
+    "import:ebay": "node --env-file=.env 03_parse_ebay.js",
+    "import:gmail": "node --env-file=.env 04_parse_gmail.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "fast-xml-parser": "^4.5.6",
+    "googleapis": "^144.0.0"
+  }
+}

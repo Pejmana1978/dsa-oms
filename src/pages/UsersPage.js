@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react'
 import Btn from '../components/Btn'
 import { RoleBadge } from '../components/Badges'
 import Modal from '../components/Modal'
-import { fetchProfiles, updateProfile } from '../lib/api'
-import { supabase } from '../lib/supabase'
+import { fetchProfiles, updateProfile, inviteUser } from '../lib/api'
+import { ROLE_PAGES } from '../lib/constants'
 import { useToast } from '../components/Toast'
+
+// Assignable roles come straight from ROLE_PAGES so the picker can never
+// offer a role the app doesn't recognise.
+const ROLES = Object.keys(ROLE_PAGES)
 
 export default function UsersPage() {
   const [profiles, setProfiles] = useState([])
@@ -28,10 +32,7 @@ export default function UsersPage() {
     if (!inviteEmail || !inviteName) { toast('Email and name are required', 'error'); return }
     setInviting(true)
     try {
-      const { error } = await supabase.auth.admin.inviteUserByEmail(inviteEmail, {
-        data: { full_name: inviteName, role: inviteRole }
-      })
-      if (error) throw error
+      await inviteUser(inviteEmail, inviteName, inviteRole)
       toast(`Invite sent to ${inviteEmail}`)
       setShowInvite(false)
       setInviteEmail(''); setInviteName(''); setInviteRole('sales')
@@ -76,7 +77,7 @@ export default function UsersPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <RoleBadge role={p.role} />
               <select value={p.role || 'sales'} onChange={e => changeRole(p.id, e.target.value)} style={{ width: 'auto', fontSize: 11, padding: '3px 7px' }}>
-                {['admin', 'sales', 'production', 'shipping'].map(r => <option key={r}>{r}</option>)}
+                {ROLES.map(r => <option key={r}>{r}</option>)}
               </select>
             </div>
           </div>
@@ -104,7 +105,7 @@ export default function UsersPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <label style={{ fontSize: 11, color: '#666' }}>Role</label>
               <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                {['admin', 'sales', 'production', 'shipping'].map(r => <option key={r}>{r}</option>)}
+                {ROLES.map(r => <option key={r}>{r}</option>)}
               </select>
             </div>
           </div>

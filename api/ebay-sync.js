@@ -1,5 +1,8 @@
+import { requireUser } from './_auth.js'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!(await requireUser(req, res))) return
   try {
     const response = await fetch(
       process.env.REACT_APP_SUPABASE_URL + '/functions/v1/ebay-sync',

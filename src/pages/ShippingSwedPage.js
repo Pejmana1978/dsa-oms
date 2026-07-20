@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Btn from '../components/Btn'
-import { updateOrder } from '../lib/api'
+import { updateOrder, authHeaders } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
@@ -47,7 +47,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     try {
       const res = await fetch('/api/ups-label', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ order: o })
       })
       const data = await res.json()
@@ -59,7 +59,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       if (o.source === 'eBay' && o.order_ref) {
         fetch('/api/ebay-tracking', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({ orderId: o.order_ref, trackingNumber: data.trackingNumber })
         }).catch(() => {})
       }
@@ -73,7 +73,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     try {
       const res = await fetch('/api/ups-track', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({ trackingNumber: o.tracking_number })
       })
       const data = await res.json()
@@ -141,18 +141,21 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
               )}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 8 }}>
-            {[
-              ['Car', o.car],
-              ['Position', (o.position || []).join(', ') || '—'],
-              ['Material', o.material || '—'],
-              ['Color / Trim', o.color || '—'],
-              ['Quantity', o.quantity || 1],
-              ['VIN', o.vin || '—'],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
-                <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined }}>{v}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+            {getOrderItems(o).map((it, i) => (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr 0.5fr', gap: 10, borderTop: i > 0 ? '1px dashed #e0ddd8' : 'none', paddingTop: i > 0 ? 8 : 0 }}>
+                {[
+                  ['Car / position', `${it.car || it.title || '—'}${(it.position || []).length ? ' · ' + (it.position || []).join(', ') : ''}`],
+                  ['Material', it.material || '—'],
+                  ['Color / Trim', it.color || '—'],
+                  ['VIN', it.vin || '—'],
+                  ['Qty', it.quantity || 1],
+                ].map(([k, v]) => (
+                  <div key={k}>
+                    <div style={{ fontSize: 10, color: '#aaa', marginBottom: 2 }}>{k}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, fontFamily: k === 'VIN' ? 'monospace' : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

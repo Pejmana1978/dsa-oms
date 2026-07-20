@@ -31,13 +31,16 @@ function BarChart({ data, maxVal }) {
 
 export default function StatsPage({ orders }) {
   const stats = useMemo(() => {
-    const total = orders.length
-    const pending = orders.filter(o => ['New', 'Awaiting verification'].includes(o.stage)).length
-    const inProd = orders.filter(o => ['Verified', 'In production'].includes(o.stage)).length
-    const shipped = orders.filter(o => o.stage === 'Shipped').length
-    const stageData = STAGES.map((s, i) => ({ label: s, value: orders.filter(o => o.stage === s).length, color: STAGE_COLORS[i] }))
-    const sourceData = ['Website', 'eBay', 'Manual'].map(s => ({ label: s, value: orders.filter(o => o.source === s).length, color: SRC_COLORS[s] }))
-    return { total, pending, inProd, shipped, stageData, sourceData }
+    // Overview counts only ACTIVE orders, using the real stage names from
+    // constants.js — the old hardcoded names didn't exist, so cards lied.
+    const active = orders.filter(o => !o.archived)
+    const total = active.length
+    const pending = active.filter(o => o.stage === 'New').length
+    const inProd = active.filter(o => ['Verified', 'In Production', 'Production Complete'].includes(o.stage)).length
+    const shipped = active.filter(o => ['Shipped to Sweden', 'Shipped to Customer', 'Delivered'].includes(o.stage)).length
+    const stageData = STAGES.map((s, i) => ({ label: s, value: active.filter(o => o.stage === s).length, color: STAGE_COLORS[i] }))
+    const sourceData = ['Website', 'eBay', 'Manual'].map(s => ({ label: s, value: active.filter(o => o.source === s).length, color: SRC_COLORS[s] }))
+    return { total, pending, inProd, shipped, stageData, sourceData, active }
   }, [orders])
 
   const maxStage = Math.max(...stats.stageData.map(x => x.value), 1)
@@ -46,8 +49,8 @@ export default function StatsPage({ orders }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
-        <StatCard label="Total orders" value={stats.total} />
-        <StatCard label="Need action" value={stats.pending} color="#BA7517" />
+        <StatCard label="Active orders" value={stats.total} />
+        <StatCard label="New (need action)" value={stats.pending} color="#BA7517" />
         <StatCard label="In production" value={stats.inProd} color="#185FA5" />
         <StatCard label="Shipped" value={stats.shipped} color="#1D9E75" />
       </div>
@@ -73,7 +76,7 @@ export default function StatsPage({ orders }) {
             </tr>
           </thead>
           <tbody>
-            {orders.slice(0, 8).map(o => (
+            {stats.active.slice(0, 8).map(o => (
               <tr key={o.id}>
                 <td style={{ padding: '6px 8px', color: '#185FA5', fontWeight: 600, fontSize: 11 }}>{o.order_ref}</td>
                 <td style={{ padding: '6px 8px' }}>{o.customer_name}</td>

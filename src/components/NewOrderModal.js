@@ -97,7 +97,7 @@ export default function NewOrderModal({ onClose, onCreated }) {
           <Field label="Color + trim code"><input value={form.color} onChange={e => setF('color', e.target.value)} placeholder="e.g. Black 040" /></Field>
         </Row>
         <Row>
-          <Field label="Quantity"><input type="number" min="1" value={form.quantity} onChange={e => setF('quantity', parseInt(e.target.value))} style={{ width: 80 }} /></Field>
+          <Field label="Quantity"><input type="number" min="1" value={form.quantity} onChange={e => setF('quantity', parseInt(e.target.value) || 1)} style={{ width: 80 }} /></Field>
         </Row>
         <SectionLabel>Files (photos, documents, VIN images)</SectionLabel>
         <div style={{ border: '1px dashed #ccc', borderRadius: 6, padding: 14, textAlign: 'center', fontSize: 12, color: '#aaa' }}>Photos can be added after creating the order</div>

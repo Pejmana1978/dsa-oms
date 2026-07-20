@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchStock, decrementStock } from '../lib/api'
+import { fetchStock } from '../lib/api'
 import Btn from './Btn'
 
 export default function StockPicker({ onSelect, onClose }) {
@@ -22,13 +22,10 @@ export default function StockPicker({ onSelect, onClose }) {
     return acc
   }, {})
 
-  async function select(item) {
-    try {
-      await decrementStock(item.id)
-      onSelect(item)
-    } catch (e) {
-      alert(e.message)
-    }
+  // Picking only records the choice — stock is decremented atomically when the
+  // order is SAVED (and returned if the pick is changed or removed).
+  function select(item) {
+    onSelect(item)
   }
 
   return (

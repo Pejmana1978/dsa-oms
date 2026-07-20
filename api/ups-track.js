@@ -1,5 +1,8 @@
+import { requireUser } from './_auth.js'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!(await requireUser(req, res))) return
   const { trackingNumber } = req.body
   try {
     const tokenRes = await fetch('https://onlinetools.ups.com/security/v1/oauth/token', {

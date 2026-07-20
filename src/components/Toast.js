@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 
 let toastFn = null
+let toastSeq = 0
 
 export function useToast() {
   return useCallback((msg, type = 'success') => {
@@ -13,7 +14,7 @@ export function ToastContainer() {
 
   useEffect(() => {
     toastFn = (msg, type) => {
-      const id = Date.now()
+      const id = ++toastSeq
       setToasts(prev => [...prev, { id, msg, type }])
       setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
     }

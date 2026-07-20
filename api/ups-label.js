@@ -1,3 +1,5 @@
+import { requireUser } from './_auth.js';
+
 const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'];
 
 async function getUPSToken() {
@@ -141,6 +143,7 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
+  if (!(await requireUser(req, res))) return;
   const { order, validateOnly } = req.body;
   try {
     const token = await getUPSToken();

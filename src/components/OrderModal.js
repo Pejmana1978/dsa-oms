@@ -4,9 +4,11 @@ import Btn from './Btn'
 import StageProgress from './StageProgress'
 import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
-import { updateOrder, uploadPhoto, deletePhoto } from '../lib/api'
+import { updateOrder, uploadPhoto, deletePhoto, takeStock, returnStock, authHeaders } from '../lib/api'
 import { useToast } from './Toast'
 import { getOrderItems, itemThumb } from '../lib/orderItems'
+import { buildSheetHTML } from '../lib/productionSheet'
+import { printPackingSlip } from '../lib/printPackingSlip'
 const TABS = ['Details', 'Email / SMS', 'Print / Export']
 function Field({ label, children }) {
   return (
@@ -25,9 +27,9 @@ function SectionLabel({ children }) {
 // Parse an eBay-style title into spec fields (car / position / material / color).
 function parseSpecFromTitle(title) {
   const t = title || ''
-  const yearMatch = t.match(/\b(20\d{2})(?:[\-–](20\d{2}))?\b/)
+  const yearMatch = t.match(/\b((?:19|20)\d{2})(?:[\-–]((?:19|20)\d{2}))?\b/)
   const year = yearMatch ? yearMatch[0] : ''
-  const makeModelMatch = t.match(/(?:For\s+)?(?:20\d{2}[\-–]20\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
+  const makeModelMatch = t.match(/(?:For\s+)?(?:(?:19|20)\d{2}[\-–](?:19|20)\d{2}\s+)?([A-Z][\w\-]+(?:\s+[A-Z][\w\-]+){1,3})/i)
   const makeModel = makeModelMatch ? makeModelMatch[1].trim() : ''
   const car = makeModel && year ? `${makeModel} ${year}` : makeModel || t
   const positions = []
@@ -56,6 +58,10 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   const [lightboxIdx, setLightboxIdx] = useState(null)
   const [photos, setPhotos] = useState(order.photos || [])
   const [documents, setDocuments] = useState(order.documents || [])
+  // Refs mirror the lists so concurrent uploads (multi-file drops fire several
+  // async handlers at once) append to the latest list instead of a stale one.
+  const photosRef = useRef(order.photos || [])
+  const documentsRef = useRef(order.documents || [])
   const [initialForm] = useState({ ...order })
   const [initialItems] = useState(() => JSON.stringify(getOrderItems(order)))
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm) || JSON.stringify(items) !== initialItems
@@ -91,10 +97,10 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   function setF(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
   function setItem(i, patch) { setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it)) }
   const COUNTRY_NAMES = { GB: 'United Kingdom', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', PL: 'Poland', PT: 'Portugal', IE: 'Ireland', CH: 'Switzerland', US: 'United States', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', JP: 'Japan' }
-  function expandAddress(addr) {
-    if (!addr) return ''
-    return addr.replace(/,\s*([A-Z]{2})$/, (m, code) => COUNTRY_NAMES[code] ? ', ' + COUNTRY_NAMES[code] : m)
-  }
+  // The stored address stays canonical (ends in the 2-letter ISO code UPS
+  // needs); the full country name is only shown as a hint, never saved.
+  const countryCodeMatch = (form.address || '').trim().match(/,\s*([A-Z]{2})$/)
+  const countryHint = countryCodeMatch ? COUNTRY_NAMES[countryCodeMatch[1]] : ''
   function parseItem(i) {
     const it = items[i]
     const { car, positions, material, color } = parseSpecFromTitle(it.car || it.title || '')
@@ -124,20 +130,40 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
         material: primary.material || '',
         color: primary.color || '',
       }
-      if (updates.ship_from_stock) {
+      // Jump a NEWLY-flagged stock order past production — but never pull an
+      // order backwards that is already at/after Shipped to Sweden, and never
+      // override the manual "Move to stage" select on later saves.
+      const shipIdx = STAGES.indexOf('Shipped to Sweden')
+      if (updates.ship_from_stock && !order.ship_from_stock && STAGES.indexOf(updates.stage) < shipIdx) {
         updates.stage = 'Shipped to Sweden'
       } else if (advanceStage) {
         const idx = STAGES.indexOf(form.stage)
         if (idx < STAGES.length - 1) updates.stage = STAGES[idx + 1]
       }
-      const updated = await updateOrder(order.id, updates)
-      onUpdated(updated)
-      toast(advanceStage ? `Advanced to "${updates.stage}"` : 'Order saved')
-      if (order.source === 'eBay' && updates.tracking_number && updates.tracking_number !== order.tracking_number) {
+      // Stock moves on SAVE: take the newly-picked unit (atomic — throws if out
+      // of stock), and return a previously-reserved one if the pick changed.
+      const prevStockId = order.stock_item?.id || null
+      const newStockId = form.stock_item?.id || null
+      if (newStockId !== prevStockId) {
+        if (newStockId) await takeStock(newStockId)
+        if (prevStockId) await returnStock(prevStockId)
+      }
+      // Write only fields that actually changed, so two people editing the same
+      // order (or the eBay sync writing refunds) don't clobber each other.
+      const changed = {}
+      for (const k of Object.keys(updates)) {
+        if (JSON.stringify(updates[k] ?? null) !== JSON.stringify(order[k] ?? null)) changed[k] = updates[k]
+      }
+      if (Object.keys(changed).length > 0) {
+        const updated = await updateOrder(order.id, changed)
+        onUpdated(updated)
+        toast(advanceStage ? `Advanced to "${updates.stage}"` : 'Order saved')
+      }
+      if (order.source === 'eBay' && changed.tracking_number) {
         fetch('/api/ebay-tracking', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderId: order.order_ref, trackingNumber: updates.tracking_number })
+          headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+          body: JSON.stringify({ orderId: order.order_ref, trackingNumber: changed.tracking_number })
         }).catch(() => {})
       }
       onClose()
@@ -174,11 +200,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           file = await compressImage(file)
         }
         const { path, url } = await uploadPhoto(order.id, file)
-        setPhotos(prev => {
-          const updated = [...prev, { path, url, name: file.name }]
-          updateOrder(order.id, { photos: updated })
-          return updated
-        })
+        photosRef.current = [...photosRef.current, { path, url, name: file.name }]
+        setPhotos(photosRef.current)
+        await updateOrder(order.id, { photos: photosRef.current })
         toast(`${file.name} uploaded`)
       } catch (err) {
         toast(err.message, 'error')
@@ -209,11 +233,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           file = await compressImage(file)
         }
         const { path, url } = await uploadPhoto(order.id, file)
-        setDocuments(prev => {
-          const updated = [...prev, { path, url, name: file.name }]
-          updateOrder(order.id, { documents: updated })
-          return updated
-        })
+        documentsRef.current = [...documentsRef.current, { path, url, name: file.name }]
+        setDocuments(documentsRef.current)
+        await updateOrder(order.id, { documents: documentsRef.current })
         toast(file.name + ' uploaded')
       } catch (err) {
         toast(err.message, 'error')
@@ -224,6 +246,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     try {
       if (doc.path) await deletePhoto(doc.path)
       const updated = documents.filter((_, i) => i !== idx)
+      documentsRef.current = updated
       setDocuments(updated)
       await updateOrder(order.id, { documents: updated })
       toast('Document removed')
@@ -235,6 +258,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
     try {
       if (photo.path) await deletePhoto(photo.path)
       const newPhotos = photos.filter((_, i) => i !== idx)
+      photosRef.current = newPhotos
       setPhotos(newPhotos)
       await updateOrder(order.id, { photos: newPhotos })
       toast('Photo removed')
@@ -245,12 +269,23 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   const stageIdx = STAGES.indexOf(form.stage)
   const canAdvance = stageIdx < STAGES.length - 1
   const firstName = order.customer_name?.split(' ')[0] || 'there'
-  const verifyTpl = `Hi ${firstName},\n\nWe have received your order ${order.order_ref} for ${order.seats} seat covers for your ${order.car}.\n\nTo proceed, please send us:\n1. A photo of your car interior (showing the seats)\n2. A photo of your VIN plate\n\nYou can reply directly to this email or send via WhatsApp.\n\nThanks,\nSeatCover Team`
-  const shipTpl = `Hi ${firstName},\n\nGreat news - your order ${order.order_ref} has been shipped!\n\nProduct: ${order.seats} seat covers, ${order.color}\nCar: ${order.car}\n\nYou will receive a tracking number shortly.\n\nThanks,\nSeatCover Team`
+  // Product lines come from the real items — never from stale order-level
+  // fields (order.seats was hardcoded by the sync and undefined on manual orders).
+  const itemLines = items.map(it => `- ${(Number(it.quantity) || 1) > 1 ? it.quantity + ' × ' : ''}${it.car || it.title || 'Seat covers'}${it.material ? ', ' + it.material : ''}${it.color ? ', ' + it.color : ''}`).join('\n')
+  const verifyTpl = `Hi ${firstName},\n\nWe have received your order ${order.order_ref}:\n${itemLines}\n\nTo proceed, please send us:\n1. A photo of your car interior (showing the seats)\n2. A photo of your VIN plate\n\nYou can reply directly to this email or send via WhatsApp.\n\nThanks,\nSeatCover Team`
+  const shipTpl = `Hi ${firstName},\n\nGreat news - your order ${order.order_ref} has been shipped!\n\n${itemLines}\n\nYou will receive a tracking number shortly.\n\nThanks,\nSeatCover Team`
   const smsTpl = `SeatCover: Your order ${order.order_ref} is confirmed. We will contact you shortly about verification. Reply STOP to opt out.`
   const waTpl = `Hi ${firstName}! Your SeatCover order *${order.order_ref}* is confirmed!\n\nWe need a couple of photos to get started:\n- Your car interior (seats)\n- Your VIN plate\n\nThanks!`
   function copyText(text) {
     navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard')).catch(() => toast('Copy failed', 'error'))
+  }
+  // The real workshop sheet (no customer contact info, no prices) — same
+  // shared builder used by the Production and Verified pages.
+  function printProductionSheet() {
+    const w = window.open('', '_blank')
+    if (!w) { toast('Popup blocked — allow popups to print', 'error'); return }
+    w.document.write('<html><head><title>Production Sheet</title><style>* { box-sizing: border-box; } body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; } @media print { button { display: none } }</style></head><body>' + buildSheetHTML({ ...order, items, notes: form.notes, photos }) + '<button onclick="window.print()">Print</button></body></html>')
+    w.document.close()
   }
   function fmtDate(d) { return d ? d.slice(0, 10).split('-').reverse().join('/') : '-' }
   const footer = tab === 'Details' && canEdit ? (
@@ -262,8 +297,8 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   ) : tab === 'Print / Export' ? (
     <>
       <Btn onClick={confirmClose}>Close</Btn>
-      <Btn onClick={() => window.print()} variant="success">Print production sheet</Btn>
-      <Btn onClick={() => window.print()} variant="primary">Print shipping label</Btn>
+      <Btn onClick={printProductionSheet} variant="success">Print production sheet</Btn>
+      <Btn onClick={() => printPackingSlip({ ...order, items, notes: form.notes })} variant="primary">Print packing slip</Btn>
     </>
   ) : <Btn onClick={confirmClose}>Close</Btn>
   return (
@@ -366,11 +401,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
               </div>
             )
           })}
-          {(!multi || form.notes) && (
-            <Field label="Order production notes">
-              <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 44, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} placeholder="Notes for the whole order" />
-            </Field>
-          )}
+          <Field label="Order production notes">
+            <textarea value={form.notes || ''} onChange={e => setF('notes', e.target.value)} readOnly={!canEdit} style={{ minHeight: 44, background: form.notes ? '#FFFBEB' : '', border: form.notes ? '1px solid #F59E0B' : '', borderRadius: 4 }} placeholder={multi ? 'Notes for the WHOLE order (per-item notes live on each item above)' : 'Notes for the whole order'} />
+          </Field>
           <Field label="Ship from Sweden stock">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: canEdit ? 'pointer' : 'default' }}>
@@ -478,7 +511,8 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
             <Field label="Tracking number"><input value={form.tracking_number || ''} onChange={e => setF('tracking_number', e.target.value)} readOnly={!canEdit} placeholder="e.g. 1Z6V1294..." /></Field>
           </Row>
           <Field label="Shipping address">
-            <textarea value={expandAddress(form.address || '').replace(/, /g, '\n')} onChange={e => setF('address', e.target.value.replace(/\n/g, ', '))} readOnly={!canEdit} style={{ minHeight: 80 }} placeholder={'Street\nCity\nPostcode\nCountry'} />
+            <textarea value={(form.address || '').replace(/, /g, '\n')} onChange={e => setF('address', e.target.value.replace(/\n/g, ', '))} readOnly={!canEdit} style={{ minHeight: 80 }} placeholder={'Street\nCity\nPostcode\nCountry code (e.g. GB)'} />
+            {countryHint && <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>Country: {countryHint} — keep the 2-letter code on the last line (UPS needs it)</div>}
           </Field>
           <Row>
             <Field label="Source">

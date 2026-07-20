@@ -6,14 +6,14 @@ import { getOrderItems } from './orderItems'
 export function buildSheetHTML(o) {
   const items = getOrderItems(o)
   const multi = items.length > 1
-  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   const customerPhotos = (o.photos || []).filter(p => p.url && ['jpg','jpeg','png','gif','webp'].includes((p.name||'').split('.').pop().toLowerCase()))
   const photosRow = customerPhotos.length > 0
     ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #eee">' +
-      customerPhotos.map(p => '<img src="' + p.url + '" style="height:120px;max-width:160px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" loading="lazy"  />').join('') + '</div>' : ''
+      customerPhotos.map(p => '<img src="' + esc(p.url) + '" style="height:120px;max-width:160px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9" loading="lazy"  />').join('') + '</div>' : ''
   const orderNote = o.notes ? '<div style="font-size:11px;background:#FFFBEB;border:1px solid #F59E0B;border-radius:4px;padding:3px 7px;margin-top:8px;display:inline-block">' + esc(o.notes) + '</div>' : ''
   const bigThumb = (t) => t
-    ? '<img src="' + t.replace('s-l1600', 's-l500') + '" style="width:150px;height:130px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />'
+    ? '<img src="' + esc(t.replace('s-l1600', 's-l500')) + '" style="width:150px;height:130px;object-fit:contain;border-radius:4px;border:1px solid #ddd;background:#f9f9f9;display:block" />'
     : '<div style="width:150px;height:130px;border:1px dashed #ccc;border-radius:4px;background:#f7f7f7"></div>'
 
   const itemBlock = (it, i) => {

@@ -6,7 +6,6 @@ import { ToastContainer, useToast } from '../components/Toast'
 import OrdersPage from './OrdersPage'
 import VerifiedPage from './VerifiedPage'
 import ProductionPage from './ProductionPage'
-import ShippingPage from './ShippingPage'
 import ShippingUSPage from './ShippingUSPage'
 import ShippingSwedPage from './ShippingSwedPage'
 import StockPage from './StockPage'
@@ -35,6 +34,9 @@ export default function Dashboard() {
   const [page, setPage] = useState(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [navNewOrders, setNavNewOrders] = useState(false)
+  // Passed to OrdersPage as a prop — a fresh object per nav click so the page
+  // re-applies the filter even when it's already mounted (no events/timeouts).
+  const [ordersFilter, setOrdersFilter] = useState(null)
   const toast = useToast()
   const role = profile?.role || 'sales'
   const pages = ROLE_PAGES[role] || ['orders']
@@ -104,7 +106,7 @@ export default function Dashboard() {
             const isActive = activePage === p && !(p === 'orders' && navNewOrders)
             return (
               <React.Fragment key={p}>
-              <div onClick={() => { setPage(p); setNavNewOrders(false); if (p === 'orders') setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'All' })), 100) }} style={{
+              <div onClick={() => { setPage(p); setNavNewOrders(false); if (p === 'orders') setOrdersFilter({ stage: 'All' }) }} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
                 color: isActive ? '#1a1a1a' : '#888', fontWeight: isActive ? 600 : 400,
@@ -119,7 +121,7 @@ export default function Dashboard() {
                 {badge && <span style={{ background: '#E24B4A', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{badge}</span>}
               </div>
               {p === 'orders' && (
-                <div onClick={() => { setPage('orders'); setNavNewOrders(true); setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'New' })), 100) }}
+                <div onClick={() => { setPage('orders'); setNavNewOrders(true); setOrdersFilter({ stage: 'New' }) }}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '7px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
@@ -152,10 +154,9 @@ export default function Dashboard() {
               <div style={{ textAlign: 'center', padding: 48, color: '#bbb', fontSize: 13 }}>Loading orders…</div>
             ) : (
               <>
-                {activePage === 'orders' && <OrdersPage orders={orders} setOrders={setOrders} role={role} />}
+                {activePage === 'orders' && <OrdersPage orders={orders} setOrders={setOrders} role={role} filterRequest={ordersFilter} onStageChange={s => setNavNewOrders(s === 'New')} />}
                 {activePage === 'verified' && <VerifiedPage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'production' && <ProductionPage orders={orders} setOrders={setOrders} role={role} />}
-                {activePage === 'shipping' && <ShippingPage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'shipping_us' && <ShippingUSPage orders={orders} setOrders={setOrders} role={role} />}
                 {activePage === 'shipping_sweden' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} mode="sweden" />}
                 {activePage === 'shipping_customer' && <ShippingSwedPage orders={orders} setOrders={setOrders} role={role} mode="customer" />}

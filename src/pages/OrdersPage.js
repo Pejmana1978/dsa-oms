@@ -2,14 +2,13 @@ import { useState, useMemo, useEffect } from 'react'
 import { StageBadge, SourceBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { STAGES } from '../lib/constants'
-import { updateOrder, deleteOrder } from '../lib/api'
+import { updateOrder, deleteOrder, fetchOrders, authHeaders } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
-import { supabase } from '../lib/supabase'
 import { getOrderItems, itemThumb } from '../lib/orderItems'
 
-export default function OrdersPage({ orders, setOrders, role }) {
+export default function OrdersPage({ orders, setOrders, role, filterRequest, onStageChange }) {
   const [q, setQ] = useState('')
   const [srcFilter, setSrcFilter] = useState('')
   const [stageFilter, setStageFilter] = useState('All')
@@ -17,23 +16,36 @@ export default function OrdersPage({ orders, setOrders, role }) {
   const [showNew, setShowNew] = useState(false)
   const [syncing, setSyncing] = useState(false)
 
+  // Sidebar nav (All orders / New orders) drives the stage filter via props —
+  // a new object per click, so repeat clicks re-apply the filter.
   useEffect(() => {
-    function handleFilter(e) { setStageFilter(e.detail) }
-    window.addEventListener('filterStage', handleFilter)
-    return () => window.removeEventListener('filterStage', handleFilter)
-  }, [])
+    if (filterRequest) setStageFilter(filterRequest.stage)
+  }, [filterRequest])
   const toast = useToast()
+
+  function selectStage(s) {
+    setStageFilter(s)
+    if (onStageChange) onStageChange(s)
+  }
+
   async function syncEbay() {
-  setSyncing(true)
-  try {
-    const res = await fetch('/api/ebay-sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    const data = await res.json()
-    if (data.error) throw new Error(data.error)
-    toast('Imported ' + data.imported + ' new eBay order' + (data.imported !== 1 ? 's' : ''))
-    if (data.imported > 0) window.location.reload()
-  } catch (e) { toast(e.message || 'Sync failed', 'error') }
-  setSyncing(false)
-}
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/ebay-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) }, body: '{}' })
+      const data = await res.json()
+      if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
+      const parts = []
+      if (data.imported) parts.push(data.imported + ' new')
+      if (data.cancelled) parts.push(data.cancelled + ' cancelled')
+      if (data.refunded) parts.push(data.refunded + ' refunded')
+      toast(parts.length ? 'Sync: ' + parts.join(', ') : 'No changes from eBay')
+      if (parts.length) {
+        const fresh = await fetchOrders()
+        setOrders(fresh || [])
+      }
+    } catch (e) { toast(e.message || 'Sync failed', 'error') }
+    setSyncing(false)
+  }
 
   const stageCounts = useMemo(() => {
     const active = orders.filter(o => !o.archived)
@@ -45,12 +57,16 @@ export default function OrdersPage({ orders, setOrders, role }) {
   const filtered = useMemo(() => {
     return orders.filter(o => {
       if (o.archived) return false
-      if (o.archived) return false
       if (stageFilter !== 'All' && o.stage !== stageFilter) return false
       if (srcFilter && o.source !== srcFilter) return false
       if (q) {
         const qs = q.toLowerCase()
-        if (!`${o.order_ref}${o.customer_name}${o.vin || ''}${o.car}`.toLowerCase().includes(qs)) return false
+        // Search across EVERY item in the order, not just order-level fields —
+        // item 2's VIN/title must be findable too.
+        const hay = [o.order_ref, o.customer_name, o.vin, o.car, o.color,
+          ...getOrderItems(o).flatMap(it => [it.title, it.car, it.vin, it.sku, it.color])]
+          .filter(Boolean).join(' ').toLowerCase()
+        if (!hay.includes(qs)) return false
       }
       return true
     })
@@ -113,7 +129,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
       {/* Stage tabs */}
       <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
         {['All', ...STAGES].map(s => (
-          <div key={s} onClick={() => setStageFilter(s)} style={{
+          <div key={s} onClick={() => selectStage(s)} style={{
             padding: '4px 11px', borderRadius: 20, border: '1px solid',
             fontSize: 11, cursor: 'pointer',
             borderColor: stageFilter === s ? '#185FA5' : '#e0ddd8',
@@ -190,7 +206,7 @@ export default function OrdersPage({ orders, setOrders, role }) {
 
                 <td style={{ padding: '9px 11px' }} onClick={e => e.stopPropagation()}>
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>
+                    {o.stage !== STAGES[STAGES.length - 1] && <Btn size="sm" onClick={() => advance(o.id)}>Advance</Btn>}
                     {(role === 'admin' || role === 'sales') && <Btn size="sm" onClick={e => { e.stopPropagation(); handleArchive(o.id, o.order_ref) }}>Archive</Btn>}
                     {role === 'admin' && <Btn size="sm" variant="danger" onClick={() => handleDelete(o.id, o.order_ref)}>✕</Btn>}
                   </div>

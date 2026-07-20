@@ -30,6 +30,7 @@ export default function VerifiedPage({ orders, setOrders, role }) {
   function batchPrint() {
     if (!selectedOrders.length) { toast('Select at least one order'); return }
     const w = window.open('', '_blank')
+    if (!w) { toast('Popup blocked — allow popups for this site to print', 'error'); return }
     const sheetsHTML = selectedOrders.map(o => buildSheetHTML(o)).join('')
     w.document.write('<html><head><title>Batch Production Sheets</title><style>* { box-sizing: border-box; } body { font-family: Arial, sans-serif; padding: 24px; font-size: 13px; } @media print { button { display: none } }</style></head><body>' + sheetsHTML + '<button onclick="window.print()" style="margin-top:16px;padding:8px 16px;font-size:14px">Print batch</button></body></html>')
     w.document.close()

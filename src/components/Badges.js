@@ -29,10 +29,11 @@ export function SourceBadge({ source }) {
 
 export function RoleBadge({ role }) {
   const styles = {
-    admin:      { background: '#E6F1FB', color: '#0C447C' },
-    sales:      { background: '#EAF3DE', color: '#27500A' },
-    production: { background: '#FBEAF0', color: '#72243E' },
-    shipping:   { background: '#E1F5EE', color: '#085041' },
+    admin:           { background: '#E6F1FB', color: '#0C447C' },
+    sales:           { background: '#EAF3DE', color: '#27500A' },
+    production:      { background: '#FBEAF0', color: '#72243E' },
+    shipping_us:     { background: '#E1F5EE', color: '#085041' },
+    shipping_sweden: { background: '#E1F5EE', color: '#085041' },
   }
   const s = styles[role] || { background: '#eee', color: '#555' }
   return (

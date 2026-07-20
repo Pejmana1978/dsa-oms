@@ -1,9 +1,12 @@
+import { requireUser } from './_auth.js'
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
+  if (!(await requireUser(req, res))) return
   const { orderId, trackingNumber, lineItemId } = req.body
   try {
     const response = await fetch(
-      `https://nvqhgkqjlvymnwcsfbee.supabase.co/functions/v1/ebay-tracking`,
+      process.env.REACT_APP_SUPABASE_URL + '/functions/v1/ebay-tracking',
       {
         method: 'POST',
         headers: {
