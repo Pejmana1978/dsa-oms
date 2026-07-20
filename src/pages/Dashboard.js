@@ -58,6 +58,7 @@ export default function Dashboard() {
   const shipUSCount = active.filter(o => o.stage === 'Production Complete').length
   const shipSwedCount = active.filter(o => o.stage === 'Shipped to Sweden').length
   function getBadge(p) {
+    if (p === 'orders' && pendingCount > 0) return pendingCount
     if (p === 'verified' && verifiedCount > 0) return verifiedCount
     if (p === 'production' && prodCount > 0) return prodCount
     if (p === 'shipping_us' && shipUSCount > 0) return shipUSCount
@@ -114,15 +115,6 @@ export default function Dashboard() {
                 </div>
                 {badge && <span style={{ background: '#E24B4A', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{badge}</span>}
               </div>
-              {p === 'orders' && pendingCount > 0 && (
-                <div onClick={e => { e.stopPropagation(); setPage('orders'); setTimeout(() => window.dispatchEvent(new CustomEvent('filterStage', { detail: 'New' })), 100) }}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 10px 4px 28px', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#185FA5' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9f9f8'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <span>↳ New orders</span>
-                  <span style={{ background: '#E24B4A', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{pendingCount}</span>
-                </div>
-              )}
               </React.Fragment>
             )
           })}
