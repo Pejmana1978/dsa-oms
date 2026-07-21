@@ -56,7 +56,13 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       const updated = await updateOrder(o.id, { tracking_number: data.trackingNumber, label_pdf: data.labelBase64 })
       setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
       downloadPDF(data.labelBase64, data.trackingNumber)
-      toast('Label created — tracking: ' + data.trackingNumber)
+      if (data.negotiatedRate) {
+        toast(`Label created — ${data.trackingNumber} · ${data.negotiatedRate} ${data.rateCurrency} (discount applied)`)
+      } else if (data.publishedRate) {
+        toast(`Label created — ${data.trackingNumber} · ⚠ ${data.publishedRate} ${data.rateCurrency} — account discount NOT applied!`, 'error')
+      } else {
+        toast('Label created — tracking: ' + data.trackingNumber)
+      }
       if (o.source === 'eBay' && o.order_ref) {
         fetch('/api/ebay-tracking', {
           method: 'POST',

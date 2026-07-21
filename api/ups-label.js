@@ -161,6 +161,10 @@ export default async function handler(req, res) {
     const shipment = result.ShipmentResponse?.ShipmentResults;
     const trackingNumber = shipment?.ShipmentIdentificationNumber;
     const labelBase64 = shipment?.PackageResults?.ShippingLabel?.GraphicImage;
+    // Surface what UPS will actually charge: negotiated (contract) rate when
+    // applied, published otherwise — so a missing discount is visible instantly.
+    const negotiated = shipment?.NegotiatedRateCharges?.TotalCharge;
+    const published = shipment?.ShipmentCharges?.TotalCharges;
 
     const parts = order.address.split(',').map(s => s.trim());
     const countryCode = parts[parts.length - 1];
@@ -170,7 +174,13 @@ export default async function handler(req, res) {
       await sendExportEmail(trackingNumber, shipment.Form.Image.GraphicImage);
     }
 
-    return res.status(200).json({ trackingNumber, labelBase64 });
+    return res.status(200).json({
+      trackingNumber,
+      labelBase64,
+      negotiatedRate: negotiated?.MonetaryValue || null,
+      publishedRate: published?.MonetaryValue || null,
+      rateCurrency: negotiated?.CurrencyCode || published?.CurrencyCode || null,
+    });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
