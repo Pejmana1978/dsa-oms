@@ -122,6 +122,33 @@ async function createLabel(token, order) {
 }
 
 async function sendExportEmail(trackingNumber, invoiceBase64) {
+  // Preferred: send through the company's own Google Workspace account —
+  // no sender-domain DNS setup needed, and the email lands in Gmail's Sent
+  // folder as the paper trail. Falls back to Resend if Gmail isn't configured.
+  if (process.env.GMAIL_APP_PASSWORD) {
+    const nodemailer = (await import('nodemailer')).default;
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.GMAIL_USER || process.env.SENDER_EMAIL,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER || process.env.SENDER_EMAIL,
+      to: 'exportsthlm@ups.com',
+      subject: trackingNumber,
+      html: '<p>Please find the UPS export invoice attached.</p>',
+      attachments: [{
+        filename: `invoice-${trackingNumber}.pdf`,
+        content: invoiceBase64,
+        encoding: 'base64',
+      }],
+    });
+    return;
+  }
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -131,8 +158,6 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
     body: JSON.stringify({
       from: process.env.SENDER_EMAIL,
       to: 'exportsthlm@ups.com',
-      // Resend bypasses Gmail entirely, so nothing shows in Sent — BCC a copy
-      // to our own inbox as the paper trail that the customs email went out.
       bcc: process.env.SENDER_EMAIL,
       subject: trackingNumber,
       html: '<p>Please find the UPS export invoice attached.</p>',
