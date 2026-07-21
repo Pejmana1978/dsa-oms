@@ -131,6 +131,9 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
     body: JSON.stringify({
       from: process.env.SENDER_EMAIL,
       to: 'exportsthlm@ups.com',
+      // Resend bypasses Gmail entirely, so nothing shows in Sent — BCC a copy
+      // to our own inbox as the paper trail that the customs email went out.
+      bcc: process.env.SENDER_EMAIL,
       subject: trackingNumber,
       html: '<p>Please find the UPS export invoice attached.</p>',
       attachments: [{
