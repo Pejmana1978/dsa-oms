@@ -24,9 +24,21 @@ export default async function handler(req, res) {
       }
     })
     const trackData = await trackRes.json()
-    const activity = trackData.trackResponse?.shipment?.[0]?.package?.[0]?.activity?.[0]
-    const status = activity?.status?.description || 'Unknown'
-    const delivered = status.toLowerCase().includes('delivered')
+    // Surface real UPS errors — the button used to swallow them as a bare
+    // "Error" chip, hiding e.g. 250002 (Tracking product not enabled on the app).
+    const upsErr = trackData.response?.errors?.[0]
+    if (upsErr) {
+      const hint = upsErr.code === '250002'
+        ? ' — the UPS app is missing the "Tracking" API product (add it at developer.ups.com → Apps)'
+        : ''
+      return res.status(400).json({ error: `UPS ${upsErr.code}: ${upsErr.message}${hint}` })
+    }
+    const pkg = trackData.trackResponse?.shipment?.[0]?.package?.[0]
+    const activity = pkg?.activity?.[0]
+    const status = pkg?.currentStatus?.description || activity?.status?.description || 'Unknown'
+    const delivered = activity?.status?.type === 'D'
+      || /delivered/i.test(status)
+      || (pkg?.deliveryDate || []).some(d => d?.type === 'DEL')
     return res.status(200).json({ status, delivered })
   } catch (e) {
     return res.status(500).json({ error: e.message })

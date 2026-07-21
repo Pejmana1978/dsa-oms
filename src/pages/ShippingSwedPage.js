@@ -11,6 +11,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
   const [labelLoading, setLabelLoading] = useState({})
   const [deliveryStatus, setDeliveryStatus] = useState({})
   const [showDelivered, setShowDelivered] = useState(false)
+  const [checkingAll, setCheckingAll] = useState(false)
   const toast = useToast()
 
   const queue = orders.filter(o => {
@@ -67,8 +68,8 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     setLabelLoading(prev => ({ ...prev, [o.id]: null }))
   }
 
-  async function checkDelivery(o) {
-    if (!o.tracking_number) return
+  // Returns 'delivered' | 'pending' | 'error' so the bulk checker can count.
+  async function checkOne(o, { quiet = false } = {}) {
     setDeliveryStatus(prev => ({ ...prev, [o.id]: 'checking' }))
     try {
       const res = await fetch('/api/ups-track', {
@@ -77,15 +78,49 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
         body: JSON.stringify({ trackingNumber: o.tracking_number })
       })
       const data = await res.json()
+      if (data.error) {
+        setDeliveryStatus(prev => ({ ...prev, [o.id]: 'Error' }))
+        if (!quiet) toast(data.error, 'error')
+        return 'error'
+      }
       setDeliveryStatus(prev => ({ ...prev, [o.id]: data.status }))
       if (data.delivered) {
         const updated = await updateOrder(o.id, { delivered_at: new Date().toISOString(), stage: 'Delivered' })
         setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
-        toast(o.order_ref + ' marked as delivered')
+        if (!quiet) toast(o.order_ref + ' marked as delivered')
+        return 'delivered'
       }
+      return 'pending'
     } catch (e) {
       setDeliveryStatus(prev => ({ ...prev, [o.id]: 'Error' }))
+      if (!quiet) toast(e.message, 'error')
+      return 'error'
     }
+  }
+
+  async function checkDelivery(o) {
+    if (!o.tracking_number) return
+    await checkOne(o)
+  }
+
+  // One click checks every undelivered order with a tracking number.
+  async function checkAllDeliveries() {
+    const targets = orders.filter(o => o.stage === 'Shipped to Customer' && o.tracking_number && !o.delivered_at)
+    if (!targets.length) { toast('No undelivered orders with tracking numbers'); return }
+    setCheckingAll(true)
+    let delivered = 0, pending = 0, errors = 0
+    for (const o of targets) {
+      const r = await checkOne(o, { quiet: true })
+      if (r === 'delivered') delivered++
+      else if (r === 'pending') pending++
+      else errors++
+    }
+    if (errors === targets.length) {
+      toast('All ' + errors + ' checks failed — see status next to each tracking number', 'error')
+    } else {
+      toast(`Checked ${targets.length}: ${delivered} delivered, ${pending} still in transit${errors ? ', ' + errors + ' failed' : ''}`)
+    }
+    setCheckingAll(false)
   }
 
   function handleUpdated(updated) {
@@ -98,10 +133,15 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <span style={{ fontSize: 12, color: '#888' }}>{queue.length} order{queue.length !== 1 ? 's' : ''} {mode === 'sweden' ? 'in transit to Sweden warehouse' : 'shipped to customers'}</span>
         {mode === 'customer' && (
-          <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
-            Show delivered
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={showDelivered} onChange={e => setShowDelivered(e.target.checked)} />
+              Show delivered
+            </label>
+            <Btn size="sm" variant="primary" onClick={checkAllDeliveries} disabled={checkingAll}>
+              {checkingAll ? 'Checking…' : '🔄 Check all deliveries'}
+            </Btn>
+          </div>
         )}
       </div>
       {queue.length === 0 && (
