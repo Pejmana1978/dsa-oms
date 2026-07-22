@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Btn from '../components/Btn'
-import { updateOrder, authHeaders } from '../lib/api'
+import { updateOrder, authHeaders, notifyWooShipped } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
@@ -28,6 +28,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     try {
       const updated = await updateOrder(id, { stage: newStage })
       setOrders(prev => prev.map(x => x.id === id ? updated : x))
+      notifyWooShipped(updated, newStage)
       toast(o.order_ref + ' → ' + newStage)
     } catch (e) { toast(e.message, 'error') }
   }

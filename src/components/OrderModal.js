@@ -4,7 +4,7 @@ import Btn from './Btn'
 import StageProgress from './StageProgress'
 import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
-import { updateOrder, uploadPhoto, deletePhoto, takeStock, returnStock, authHeaders } from '../lib/api'
+import { updateOrder, uploadPhoto, deletePhoto, takeStock, returnStock, authHeaders, notifyWooShipped } from '../lib/api'
 import { useToast } from './Toast'
 import { getOrderItems, itemThumb } from '../lib/orderItems'
 import { buildSheetHTML } from '../lib/productionSheet'
@@ -175,6 +175,9 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
           body: JSON.stringify({ orderId: order.order_ref, trackingNumber: changed.tracking_number })
         }).catch(() => {})
+      }
+      if (changed.stage) {
+        notifyWooShipped({ ...order, ...changed }, changed.stage)
       }
       onClose()
     } catch (e) {

@@ -112,6 +112,7 @@ serve(async () => {
 
       const { error } = await supabase.from("orders").insert({
         order_ref: ref,
+        woo_order_id: o.id,
         customer_name: [ship.first_name, ship.last_name].filter(Boolean).join(" ")
           || [o.billing?.first_name, o.billing?.last_name].filter(Boolean).join(" ")
           || "Website Customer",

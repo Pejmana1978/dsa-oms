@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { StageBadge, SourceBadge } from '../components/Badges'
 import Btn from '../components/Btn'
 import { STAGES } from '../lib/constants'
-import { updateOrder, deleteOrder, fetchOrders, authHeaders } from '../lib/api'
+import { updateOrder, deleteOrder, fetchOrders, authHeaders, notifyWooShipped } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
@@ -97,6 +97,7 @@ export default function OrdersPage({ orders, setOrders, role, filterRequest, onS
     try {
       const updated = await updateOrder(id, { stage: newStage })
       setOrders(prev => prev.map(x => x.id === id ? updated : x))
+      notifyWooShipped(updated, newStage)
       toast(`${o.order_ref} → "${newStage}"`)
     } catch (e) { toast(e.message, 'error') }
   }

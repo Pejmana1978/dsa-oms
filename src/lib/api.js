@@ -79,6 +79,20 @@ export async function updateProfile(id, updates) {
   return data
 }
 
+// When a WEBSITE order ships to the customer, mark it Completed in
+// WooCommerce and leave the tracking number as a customer note.
+// Fire-and-forget — a Woo hiccup must never block the OMS stage change.
+export function notifyWooShipped(order, newStage) {
+  if (order?.source !== 'Website' || newStage !== 'Shipped to Customer' || !order?.woo_order_id) return
+  authHeaders().then(h =>
+    fetch('/api/woo-shipped', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...h },
+      body: JSON.stringify({ wooOrderId: order.woo_order_id, trackingNumber: order.tracking_number || '' })
+    })
+  ).catch(() => {})
+}
+
 export async function fetchStock() {
   const { data, error } = await supabase.from('stock').select('*').order('model').order('type').order('colour')
   if (error) throw error
