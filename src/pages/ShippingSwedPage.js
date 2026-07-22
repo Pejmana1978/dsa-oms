@@ -285,27 +285,33 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 480, width: '92%' }}>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Choose UPS service</div>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>{quote.order.order_ref} → {quote.order.customer_name}</div>
-            {quote.services.map(s => (
+            {quote.services.map(s => {
+              const etaDate = s.etaDate && s.etaDate.length === 8 ? `${s.etaDate.slice(6, 8)}/${s.etaDate.slice(4, 6)}` : null
+              const etaDays = s.etaDays ? `${s.etaDays} business day${String(s.etaDays) === '1' ? '' : 's'}` : null
+              const eta = [etaDate, etaDays && (etaDate ? `(${etaDays})` : etaDays)].filter(Boolean).join(' ')
+              return (
               <label key={s.code} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', borderRadius: 8, marginBottom: 6, cursor: 'pointer',
                 border: quote.chosen === s.code ? '2px solid #185FA5' : '1px solid #e0ddd8',
                 background: quote.chosen === s.code ? '#F0F7FF' : '#fafaf9'
               }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input type="radio" name="ups-service" checked={quote.chosen === s.code} onChange={() => setQuote(prev => ({ ...prev, chosen: s.code }))} />
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</span>
+                <input type="radio" name="ups-service" style={{ flexShrink: 0 }} checked={quote.chosen === s.code} onChange={() => setQuote(prev => ({ ...prev, chosen: s.code }))} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'block' }}>{s.name}</span>
+                  {eta && <span style={{ fontSize: 11, color: '#888', display: 'block', marginTop: 2 }}>Est. delivery {eta}</span>}
                 </span>
-                <span style={{ textAlign: 'right' }}>
+                <span style={{ flexShrink: 0, minWidth: 130, textAlign: 'right' }}>
                   {s.negotiatedRate
                     ? <>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1D9E75' }}>{s.negotiatedRate} {s.currency}</span>
-                        {s.publishedRate && <span style={{ fontSize: 10, color: '#aaa', display: 'block', textDecoration: 'line-through' }}>{s.publishedRate} {s.currency}</span>}
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1D9E75', display: 'block' }}>{s.negotiatedRate} {s.currency}</span>
+                        {s.publishedRate && <span style={{ fontSize: 12, color: '#888', display: 'block', textDecoration: 'line-through', marginTop: 2 }}>{s.publishedRate} {s.currency}</span>}
                       </>
                     : <span style={{ fontSize: 12, fontWeight: 700, color: '#E24B4A' }}>⚠ {s.publishedRate} {s.currency} — no discount!</span>}
                 </span>
               </label>
-            ))}
+              )
+            })}
             <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Prices include fuel surcharge, exclude VAT/duties. Nothing is created until you confirm.</div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <Btn onClick={() => setQuote(null)}>Cancel</Btn>
