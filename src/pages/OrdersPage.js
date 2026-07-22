@@ -28,22 +28,38 @@ export default function OrdersPage({ orders, setOrders, role, filterRequest, onS
     if (onStageChange) onStageChange(s)
   }
 
+  // One button, both channels: eBay first, then the WooCommerce website.
   async function syncEbay() {
     setSyncing(true)
+    const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
+    let changed = false
     try {
-      const res = await fetch('/api/ebay-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) }, body: '{}' })
+      const res = await fetch('/api/ebay-sync', { method: 'POST', headers, body: '{}' })
       const data = await res.json()
       if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
       const parts = []
       if (data.imported) parts.push(data.imported + ' new')
       if (data.cancelled) parts.push(data.cancelled + ' cancelled')
       if (data.refunded) parts.push(data.refunded + ' refunded')
-      toast(parts.length ? 'Sync: ' + parts.join(', ') : 'No changes from eBay')
-      if (parts.length) {
-        const fresh = await fetchOrders()
-        setOrders(fresh || [])
-      }
-    } catch (e) { toast(e.message || 'Sync failed', 'error') }
+      toast(parts.length ? 'eBay: ' + parts.join(', ') : 'No changes from eBay')
+      if (parts.length) changed = true
+    } catch (e) { toast('eBay sync: ' + (e.message || 'failed'), 'error') }
+    try {
+      const res = await fetch('/api/woo-sync', { method: 'POST', headers, body: '{}' })
+      const data = await res.json()
+      if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error))
+      const parts = []
+      if (data.imported) parts.push(data.imported + ' new')
+      if (data.cancelled) parts.push(data.cancelled + ' cancelled')
+      if (data.refunded) parts.push(data.refunded + ' refunded')
+      if (data.skippedUsCa) parts.push(data.skippedUsCa + ' US/CA skipped')
+      toast(parts.length ? 'Website: ' + parts.join(', ') : 'No changes from website')
+      if (data.imported || data.cancelled || data.refunded) changed = true
+    } catch (e) { toast('Website sync: ' + (e.message || 'failed'), 'error') }
+    if (changed) {
+      const fresh = await fetchOrders()
+      setOrders(fresh || [])
+    }
     setSyncing(false)
   }
 
