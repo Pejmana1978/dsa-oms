@@ -61,8 +61,18 @@ async function validateAddress(token, address) {
   return await res.json();
 }
 
-// Price the exact same shipment the label would create — used for the
-// confirm-before-buy step. Nothing is created or billed by this call.
+const SERVICE_NAMES = {
+  '11': 'UPS Standard',
+  '65': 'UPS Express Saver',
+  '07': 'UPS Express',
+  '08': 'UPS Expedited',
+  '54': 'UPS Express Plus',
+  '96': 'UPS Express Freight',
+};
+
+// Price the exact same shipment the label would create, across ALL available
+// services ("Shop") — used for the choose-and-confirm step. Nothing is
+// created or billed by this call.
 async function rateShipment(token, order) {
   const { countryCode, postcode, city, street } = parseShipAddress(order.address);
   const body = {
@@ -77,7 +87,6 @@ async function rateShipment(token, order) {
         ShipTo: { Name: order.customer_name || 'Customer', Address: { AddressLine: street, City: city, PostalCode: postcode, CountryCode: countryCode } },
         ShipFrom: { Name: 'DSA Auto Seat Factory AB', Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' } },
         PaymentDetails: { ShipmentCharge: { Type: '01', BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER } } },
-        Service: { Code: '11', Description: 'UPS Standard' },
         ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
         Package: {
           PackagingType: { Code: '02' },
@@ -87,7 +96,7 @@ async function rateShipment(token, order) {
       }
     }
   };
-  const res = await fetch('https://onlinetools.ups.com/api/rating/v2409/Rate', {
+  const res = await fetch('https://onlinetools.ups.com/api/rating/v2409/Shop', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -100,9 +109,10 @@ async function rateShipment(token, order) {
   return await res.json();
 }
 
-async function createLabel(token, order) {
+async function createLabel(token, order, serviceCode) {
   const { countryCode, postcode, city, street: addressLine } = parseShipAddress(order.address);
   const isNonEU = !EU_COUNTRIES.includes(countryCode);
+  const service = SERVICE_NAMES[serviceCode] ? serviceCode : '11';
 
   const shipmentBody = {
     ShipmentRequest: {
@@ -141,7 +151,7 @@ async function createLabel(token, order) {
         // NOTE: must be ShipmentRatingOptions — the old RateInformation field is
         // silently ignored by the REST API, which billed published rates.
         ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
-        Service: { Code: '11', Description: 'UPS Standard' },
+        Service: { Code: service, Description: SERVICE_NAMES[service] },
         Package: {
           Packaging: { Code: '02' },
           Dimensions: {
@@ -251,7 +261,7 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   if (!(await requireUser(req, res))) return;
-  const { order, validateOnly, quoteOnly } = req.body;
+  const { order, validateOnly, quoteOnly, serviceCode } = req.body;
   const parsed = parseShipAddress(order?.address);
   if (!parsed.countryCode) {
     return res.status(400).json({ error: `Can't read the country from the address — the last line must be a 2-letter code or country name (got "${parsed.last}")` });
@@ -269,19 +279,19 @@ export default async function handler(req, res) {
       const errs = data.response?.errors;
       if (errs) return res.status(400).json({ error: `UPS ${errs[0]?.code}: ${errs[0]?.message}` });
       const rs = data.RateResponse?.RatedShipment;
-      const rated = Array.isArray(rs) ? rs[0] : rs;
-      const pub = rated?.TotalCharges;
-      const neg = rated?.NegotiatedRateCharges?.TotalCharge;
-      return res.status(200).json({
-        quote: true,
-        service: 'UPS Standard',
-        publishedRate: pub?.MonetaryValue || null,
-        negotiatedRate: neg?.MonetaryValue || null,
-        rateCurrency: neg?.CurrencyCode || pub?.CurrencyCode || null,
-      });
+      const services = (Array.isArray(rs) ? rs : [rs]).filter(Boolean).map(r => ({
+        code: r.Service?.Code,
+        name: SERVICE_NAMES[r.Service?.Code] || ('UPS service ' + r.Service?.Code),
+        publishedRate: r.TotalCharges?.MonetaryValue || null,
+        negotiatedRate: r.NegotiatedRateCharges?.TotalCharge?.MonetaryValue || null,
+        currency: r.NegotiatedRateCharges?.TotalCharge?.CurrencyCode || r.TotalCharges?.CurrencyCode || null,
+      })).sort((a, b) =>
+        parseFloat(a.negotiatedRate ?? a.publishedRate ?? '9e9') - parseFloat(b.negotiatedRate ?? b.publishedRate ?? '9e9')
+      );
+      return res.status(200).json({ quote: true, services });
     }
 
-    const result = await createLabel(token, order);
+    const result = await createLabel(token, order, serviceCode);
     if (result.response?.errors) {
       return res.status(400).json({ error: result.response.errors[0]?.message || 'UPS error' });
     }

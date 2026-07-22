@@ -12,6 +12,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
   const [deliveryStatus, setDeliveryStatus] = useState({})
   const [showDelivered, setShowDelivered] = useState(false)
   const [checkingAll, setCheckingAll] = useState(false)
+  const [quote, setQuote] = useState(null) // { order, services[], chosen }
   const toast = useToast()
 
   const queue = orders.filter(o => {
@@ -42,12 +43,12 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     URL.revokeObjectURL(url)
   }
 
+  // Step 1: quote every available service (nothing created or billed) and
+  // open the picker so the operator sees all prices and chooses.
   async function upsLabel(o) {
     if (!o.address) { toast('No address on this order', 'error'); return }
-    setLabelLoading(prev => ({ ...prev, [o.id]: 'generating' }))
+    setLabelLoading(prev => ({ ...prev, [o.id]: 'quoting' }))
     try {
-      // Step 1: quote only — show the price and let the operator confirm
-      // BEFORE anything is created or billed.
       const qres = await fetch('/api/ups-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
@@ -55,25 +56,21 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       })
       const q = await qres.json()
       if (q.error) throw new Error(q.error)
-      const lines = [`${o.order_ref} → ${o.customer_name}`, '']
-      if (q.negotiatedRate) {
-        lines.push(`${q.service}: ${q.negotiatedRate} ${q.rateCurrency} (your negotiated rate)`)
-        lines.push(`(published rate would be ${q.publishedRate} ${q.rateCurrency})`)
-      } else if (q.publishedRate) {
-        lines.push(`⚠ ${q.service}: ${q.publishedRate} ${q.rateCurrency} — PUBLISHED rate, your discount is NOT being applied!`)
-      } else {
-        lines.push('UPS returned no price for this shipment.')
-      }
-      lines.push('', 'Create the label?')
-      if (!window.confirm(lines.join('\n'))) {
-        setLabelLoading(prev => ({ ...prev, [o.id]: null }))
-        return
-      }
-      // Step 2: confirmed — create the label for real.
+      if (!q.services || q.services.length === 0) throw new Error('UPS returned no services for this address')
+      setQuote({ order: o, services: q.services, chosen: q.services[0].code })
+    } catch (e) { toast(e.message, 'error') }
+    setLabelLoading(prev => ({ ...prev, [o.id]: null }))
+  }
+
+  // Step 2: operator picked a service and confirmed — create the label.
+  async function createLabelNow(o, serviceCode) {
+    setQuote(null)
+    setLabelLoading(prev => ({ ...prev, [o.id]: 'generating' }))
+    try {
       const res = await fetch('/api/ups-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({ order: o })
+        body: JSON.stringify({ order: o, serviceCode })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -197,7 +194,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
               {o.stage === 'Delivered' && <span style={{ fontSize: 10, fontWeight: 600, background: '#F1EFE8', color: '#444441', borderRadius: 4, padding: '2px 7px' }}>Delivered</span>}
               {o.stage === 'Shipped to Sweden' && (
                 <Btn size="sm" onClick={() => o.tracking_number && o.label_pdf ? downloadPDF(o.label_pdf, o.tracking_number) : upsLabel(o)} disabled={!!labelLoading[o.id]}>
-                  {labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}
+                  {labelLoading[o.id] === 'quoting' ? 'Getting prices…' : labelLoading[o.id] === 'generating' ? 'Generating…' : o.tracking_number ? '🖨 Reprint' : '📦 UPS Label'}
                 </Btn>
               )}
               {o.stage === 'Shipped to Sweden' && o.tracking_number && (
@@ -283,6 +280,42 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
         </div>
       ))}
       {selected && <OrderModal order={selected} role={role} onClose={() => setSelected(null)} onUpdated={handleUpdated} />}
+      {quote && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 480, width: '92%' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Choose UPS service</div>
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>{quote.order.order_ref} → {quote.order.customer_name}</div>
+            {quote.services.map(s => (
+              <label key={s.code} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                padding: '10px 12px', borderRadius: 8, marginBottom: 6, cursor: 'pointer',
+                border: quote.chosen === s.code ? '2px solid #185FA5' : '1px solid #e0ddd8',
+                background: quote.chosen === s.code ? '#F0F7FF' : '#fafaf9'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="radio" name="ups-service" checked={quote.chosen === s.code} onChange={() => setQuote(prev => ({ ...prev, chosen: s.code }))} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</span>
+                </span>
+                <span style={{ textAlign: 'right' }}>
+                  {s.negotiatedRate
+                    ? <>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#1D9E75' }}>{s.negotiatedRate} {s.currency}</span>
+                        {s.publishedRate && <span style={{ fontSize: 10, color: '#aaa', display: 'block', textDecoration: 'line-through' }}>{s.publishedRate} {s.currency}</span>}
+                      </>
+                    : <span style={{ fontSize: 12, fontWeight: 700, color: '#E24B4A' }}>⚠ {s.publishedRate} {s.currency} — no discount!</span>}
+                </span>
+              </label>
+            ))}
+            <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Prices include fuel surcharge, exclude VAT/duties. Nothing is created until you confirm.</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+              <Btn onClick={() => setQuote(null)}>Cancel</Btn>
+              <Btn variant="primary" onClick={() => createLabelNow(quote.order, quote.chosen)}>
+                Create label — {(quote.services.find(s => s.code === quote.chosen) || {}).negotiatedRate || (quote.services.find(s => s.code === quote.chosen) || {}).publishedRate} {(quote.services.find(s => s.code === quote.chosen) || {}).currency}
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
