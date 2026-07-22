@@ -2,6 +2,33 @@ import { requireUser } from './_auth.js';
 
 const EU_COUNTRIES = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'];
 
+// Hand-edited addresses often end with the country spelled out ("United
+// Kingdom") instead of the ISO code UPS requires — translate instead of failing.
+const COUNTRY_NAME_TO_CODE = {
+  'united kingdom': 'GB', 'great britain': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB', 'northern ireland': 'GB',
+  'germany': 'DE', 'france': 'FR', 'sweden': 'SE', 'denmark': 'DK', 'norway': 'NO', 'finland': 'FI', 'iceland': 'IS',
+  'italy': 'IT', 'spain': 'ES', 'portugal': 'PT', 'netherlands': 'NL', 'the netherlands': 'NL', 'belgium': 'BE',
+  'austria': 'AT', 'switzerland': 'CH', 'ireland': 'IE', 'poland': 'PL', 'hungary': 'HU', 'greece': 'GR',
+  'czech republic': 'CZ', 'czechia': 'CZ', 'slovakia': 'SK', 'slovenia': 'SI', 'croatia': 'HR', 'romania': 'RO',
+  'bulgaria': 'BG', 'luxembourg': 'LU', 'estonia': 'EE', 'latvia': 'LV', 'lithuania': 'LT', 'malta': 'MT', 'cyprus': 'CY',
+  'australia': 'AU', 'new zealand': 'NZ', 'united states': 'US', 'usa': 'US', 'canada': 'CA', 'japan': 'JP',
+};
+
+function parseShipAddress(address) {
+  const parts = (address || '').split(',').map(s => s.trim()).filter(Boolean);
+  const last = parts[parts.length - 1] || '';
+  const countryCode = /^[A-Za-z]{2}$/.test(last)
+    ? last.toUpperCase()
+    : (COUNTRY_NAME_TO_CODE[last.toLowerCase()] || null);
+  return {
+    countryCode,
+    last,
+    postcode: parts[parts.length - 2] || '',
+    city: parts[parts.length - 3] || '',
+    street: parts.slice(0, Math.max(parts.length - 3, 0)).join(', '),
+  };
+}
+
 async function getUPSToken() {
   const res = await fetch('https://onlinetools.ups.com/security/v1/oauth/token', {
     method: 'POST',
@@ -16,11 +43,7 @@ async function getUPSToken() {
 }
 
 async function validateAddress(token, address) {
-  const parts = address.split(',').map(s => s.trim());
-  const countryCode = parts[parts.length - 1];
-  const postcode = parts[parts.length - 2];
-  const city = parts[parts.length - 3];
-  const street = parts.slice(0, parts.length - 3).join(', ');
+  const { countryCode, postcode, city, street } = parseShipAddress(address);
   const res = await fetch('https://onlinetools.ups.com/api/addressvalidation/v2/1', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -39,11 +62,7 @@ async function validateAddress(token, address) {
 }
 
 async function createLabel(token, order) {
-  const parts = order.address.split(',').map(s => s.trim());
-  const countryCode = parts[parts.length - 1];
-  const postcode = parts[parts.length - 2];
-  const city = parts[parts.length - 3];
-  const addressLine = parts.slice(0, parts.length - 3).join(', ');
+  const { countryCode, postcode, city, street: addressLine } = parseShipAddress(order.address);
   const isNonEU = !EU_COUNTRIES.includes(countryCode);
 
   const shipmentBody = {
@@ -173,6 +192,10 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   if (!(await requireUser(req, res))) return;
   const { order, validateOnly } = req.body;
+  const parsed = parseShipAddress(order?.address);
+  if (!parsed.countryCode) {
+    return res.status(400).json({ error: `Can't read the country from the address — the last line must be a 2-letter code or country name (got "${parsed.last}")` });
+  }
   try {
     const token = await getUPSToken();
 
@@ -194,9 +217,7 @@ export default async function handler(req, res) {
     const negotiated = shipment?.NegotiatedRateCharges?.TotalCharge;
     const published = shipment?.ShipmentCharges?.TotalCharges;
 
-    const parts = order.address.split(',').map(s => s.trim());
-    const countryCode = parts[parts.length - 1];
-    const isNonEU = !EU_COUNTRIES.includes(countryCode);
+    const isNonEU = !EU_COUNTRIES.includes(parsed.countryCode);
 
     if (isNonEU && shipment?.Form?.Image?.GraphicImage) {
       await sendExportEmail(trackingNumber, shipment.Form.Image.GraphicImage);

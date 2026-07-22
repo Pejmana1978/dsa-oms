@@ -96,11 +96,20 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
   }, [lightboxIdx, onClose, imagePhotos.length, isDirty])
   function setF(k, v) { setForm(prev => ({ ...prev, [k]: v })) }
   function setItem(i, patch) { setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it)) }
-  const COUNTRY_NAMES = { GB: 'United Kingdom', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', PL: 'Poland', PT: 'Portugal', IE: 'Ireland', CH: 'Switzerland', US: 'United States', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', JP: 'Japan' }
-  // The stored address stays canonical (ends in the 2-letter ISO code UPS
-  // needs); the full country name is only shown as a hint, never saved.
-  const countryCodeMatch = (form.address || '').trim().match(/,\s*([A-Z]{2})$/)
-  const countryHint = countryCodeMatch ? COUNTRY_NAMES[countryCodeMatch[1]] : ''
+  const COUNTRY_NAMES = { GB: 'United Kingdom', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain', NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland', PL: 'Poland', PT: 'Portugal', IE: 'Ireland', CH: 'Switzerland', US: 'United States', CA: 'Canada', AU: 'Australia', NZ: 'New Zealand', JP: 'Japan', IS: 'Iceland', HU: 'Hungary', GR: 'Greece', CZ: 'Czechia', SK: 'Slovakia', SI: 'Slovenia', HR: 'Croatia', RO: 'Romania', BG: 'Bulgaria', LU: 'Luxembourg', EE: 'Estonia', LV: 'Latvia', LT: 'Lithuania', MT: 'Malta', CY: 'Cyprus' }
+  const NAME_TO_CODE = Object.fromEntries(Object.entries(COUNTRY_NAMES).map(([code, name]) => [name.toLowerCase(), code]))
+  // The stored address stays canonical: it must END in the 2-letter ISO code
+  // UPS needs. A hand-typed country name ("United Kingdom") is converted to
+  // its code on save; the full name is only ever shown as a hint.
+  function normalizeAddressCountry(addr) {
+    const trimmed = (addr || '').trim()
+    const m = trimmed.match(/,\s*([^,]+)$/)
+    const code = m && NAME_TO_CODE[m[1].trim().toLowerCase()]
+    return code ? trimmed.replace(/,\s*[^,]+$/, ', ' + code) : addr
+  }
+  const addrTail = ((form.address || '').trim().match(/,\s*([^,]+)$/) || [])[1]?.trim() || ''
+  const tailCode = /^[A-Za-z]{2}$/.test(addrTail) ? addrTail.toUpperCase() : NAME_TO_CODE[addrTail.toLowerCase()]
+  const countryHint = tailCode ? (COUNTRY_NAMES[tailCode] || tailCode) : ''
   function parseItem(i) {
     const it = items[i]
     const { car, positions, material, color } = parseSpecFromTitle(it.car || it.title || '')
@@ -120,6 +129,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
       const sumQty = items.reduce((n, it) => n + (Number(it.quantity) || 0), 0) || 1
       let updates = {
         ...form, items, photos, documents,
+        address: normalizeAddressCountry(form.address),
         car: primary.car || primary.title || form.car,
         thumbnail: primary.custom_thumbnail || primary.thumbnail || form.thumbnail,
         quantity: sumQty,
@@ -512,7 +522,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
           </Row>
           <Field label="Shipping address">
             <textarea value={(form.address || '').replace(/, /g, '\n')} onChange={e => setF('address', e.target.value.replace(/\n/g, ', '))} readOnly={!canEdit} style={{ minHeight: 80 }} placeholder={'Street\nCity\nPostcode\nCountry code (e.g. GB)'} />
-            {countryHint && <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>Country: {countryHint} — keep the 2-letter code on the last line (UPS needs it)</div>}
+            {countryHint && <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>Country: {countryHint} — saved as the 2-letter code ({tailCode}) for UPS</div>}
           </Field>
           <Row>
             <Field label="Source">
