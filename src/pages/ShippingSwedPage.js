@@ -296,7 +296,8 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
                 border: quote.chosen === s.code ? '2px solid #185FA5' : '1px solid #e0ddd8',
                 background: quote.chosen === s.code ? '#F0F7FF' : '#fafaf9'
               }}>
-                <input type="radio" name="ups-service" style={{ flexShrink: 0 }} checked={quote.chosen === s.code} onChange={() => setQuote(prev => ({ ...prev, chosen: s.code }))} />
+                {/* explicit size — the app's global CSS makes inputs width:100% */}
+                <input type="radio" name="ups-service" style={{ flexShrink: 0, width: 16, height: 16, cursor: 'pointer' }} checked={quote.chosen === s.code} onChange={() => setQuote(prev => ({ ...prev, chosen: s.code }))} />
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', display: 'block' }}>{s.name}</span>
                   {eta && <span style={{ fontSize: 11, color: '#888', display: 'block', marginTop: 2 }}>Est. delivery {eta}</span>}
