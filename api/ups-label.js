@@ -99,7 +99,9 @@ async function createLabel(token, order) {
             BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER }
           }
         },
-        RateInformation: { NegotiatedRatesIndicator: '' },
+        // NOTE: must be ShipmentRatingOptions — the old RateInformation field is
+        // silently ignored by the REST API, which billed published rates.
+        ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
         Service: { Code: '11', Description: 'UPS Standard' },
         Package: {
           Packaging: { Code: '02' },
@@ -113,11 +115,28 @@ async function createLabel(token, order) {
           }
         },
         ...(isNonEU && {
+          // FormType 01 = UPS GENERATES the commercial invoice (07 meant
+          // "customer supplies own forms" — no invoice was ever produced,
+          // so the customs email had nothing to send).
           InternationalForms: {
-            FormType: '07',
+            FormType: '01',
+            InvoiceNumber: String(order.order_ref || '').slice(0, 35),
             InvoiceDate: new Date().toISOString().slice(0,10).replace(/-/g,''),
             ReasonForExport: 'SAMPLE',
             CurrencyCode: 'USD',
+            Contacts: {
+              SoldTo: {
+                Name: String(order.customer_name || 'Customer').slice(0, 35),
+                AttentionName: String(order.customer_name || 'Customer').slice(0, 35),
+                Phone: { Number: order.phone || '0000000000' },
+                Address: {
+                  AddressLine: addressLine,
+                  City: city,
+                  PostalCode: postcode,
+                  CountryCode: countryCode
+                }
+              }
+            },
             Product: [{
               Description: 'Seat Cover Sample',
               CommodityCode: '980100',
