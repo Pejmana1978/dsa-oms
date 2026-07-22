@@ -84,6 +84,10 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       } else {
         toast('Label created — tracking: ' + data.trackingNumber)
       }
+      if (data.customs) {
+        if (data.customs.emailed) toast('Customs invoice emailed to UPS — copy in Gmail Sent folder')
+        else toast('⚠ Customs invoice: ' + (data.customs.error || 'not sent'), 'error')
+      }
       if (o.source === 'eBay' && o.order_ref) {
         fetch('/api/ebay-tracking', {
           method: 'POST',

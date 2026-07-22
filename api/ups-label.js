@@ -169,9 +169,10 @@ async function createLabel(token, order, serviceCode) {
           }
         },
         ...(isNonEU && {
-          // FormType 01 = UPS GENERATES the commercial invoice (07 meant
-          // "customer supplies own forms" — no invoice was ever produced,
-          // so the customs email had nothing to send).
+          // Must sit inside ShipmentServiceOptions — placed directly under
+          // Shipment, UPS silently ignores it (label but "No forms to print").
+          // FormType 01 = UPS GENERATES the commercial invoice.
+          ShipmentServiceOptions: {
           InternationalForms: {
             FormType: '01',
             InvoiceNumber: String(order.order_ref || '').slice(0, 35),
@@ -197,6 +198,7 @@ async function createLabel(token, order, serviceCode) {
               OriginCountryCode: 'US',
               Unit: { Number: '1', UnitOfMeasurement: { Code: 'EA' }, Value: '1.00' }
             }]
+          }
           }
         })
       },
@@ -316,8 +318,20 @@ export default async function handler(req, res) {
 
     const isNonEU = !EU_COUNTRIES.includes(parsed.countryCode);
 
-    if (isNonEU && shipment?.Form?.Image?.GraphicImage) {
-      await sendExportEmail(trackingNumber, shipment.Form.Image.GraphicImage);
+    // Report the customs-invoice outcome explicitly — never fail silently.
+    let customs = null;
+    if (isNonEU) {
+      const formImage = shipment?.Form?.Image?.GraphicImage;
+      if (!formImage) {
+        customs = { generated: false, emailed: false, error: 'UPS did not return a customs invoice' };
+      } else {
+        try {
+          await sendExportEmail(trackingNumber, formImage);
+          customs = { generated: true, emailed: true };
+        } catch (e) {
+          customs = { generated: true, emailed: false, error: e.message };
+        }
+      }
     }
 
     return res.status(200).json({
@@ -326,6 +340,7 @@ export default async function handler(req, res) {
       negotiatedRate: negotiated?.MonetaryValue || null,
       publishedRate: published?.MonetaryValue || null,
       rateCurrency: negotiated?.CurrencyCode || published?.CurrencyCode || null,
+      customs,
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
