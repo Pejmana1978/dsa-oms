@@ -68,6 +68,8 @@ async function createLabel(token, order) {
   const shipmentBody = {
     ShipmentRequest: {
       Shipment: {
+        // Required by UPS for international (incl. post-Brexit UK) shipments.
+        Description: 'Car seat covers',
         Shipper: {
           Name: 'DSA Auto Seat Factory AB',
           AttentionName: 'DSA Seat Factory',
