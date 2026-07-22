@@ -61,6 +61,45 @@ async function validateAddress(token, address) {
   return await res.json();
 }
 
+// Price the exact same shipment the label would create — used for the
+// confirm-before-buy step. Nothing is created or billed by this call.
+async function rateShipment(token, order) {
+  const { countryCode, postcode, city, street } = parseShipAddress(order.address);
+  const body = {
+    RateRequest: {
+      Request: { TransactionReference: { CustomerContext: String(order.order_ref || 'quote') } },
+      Shipment: {
+        Shipper: {
+          Name: 'DSA Auto Seat Factory AB',
+          ShipperNumber: process.env.UPS_ACCOUNT_NUMBER,
+          Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' }
+        },
+        ShipTo: { Name: order.customer_name || 'Customer', Address: { AddressLine: street, City: city, PostalCode: postcode, CountryCode: countryCode } },
+        ShipFrom: { Name: 'DSA Auto Seat Factory AB', Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' } },
+        PaymentDetails: { ShipmentCharge: { Type: '01', BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER } } },
+        Service: { Code: '11', Description: 'UPS Standard' },
+        ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
+        Package: {
+          PackagingType: { Code: '02' },
+          Dimensions: { UnitOfMeasurement: { Code: 'CM' }, Length: '45', Width: '45', Height: '2' },
+          PackageWeight: { UnitOfMeasurement: { Code: 'KGS' }, Weight: '1' }
+        }
+      }
+    }
+  };
+  const res = await fetch('https://onlinetools.ups.com/api/rating/v2409/Rate', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'transId': String(order.order_ref || 'quote'),
+      'transactionSrc': 'seatcover-oms'
+    },
+    body: JSON.stringify(body)
+  });
+  return await res.json();
+}
+
 async function createLabel(token, order) {
   const { countryCode, postcode, city, street: addressLine } = parseShipAddress(order.address);
   const isNonEU = !EU_COUNTRIES.includes(countryCode);
@@ -212,7 +251,7 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   if (!(await requireUser(req, res))) return;
-  const { order, validateOnly } = req.body;
+  const { order, validateOnly, quoteOnly } = req.body;
   const parsed = parseShipAddress(order?.address);
   if (!parsed.countryCode) {
     return res.status(400).json({ error: `Can't read the country from the address — the last line must be a 2-letter code or country name (got "${parsed.last}")` });
@@ -223,6 +262,23 @@ export default async function handler(req, res) {
     if (validateOnly) {
       const validation = await validateAddress(token, order.address);
       return res.status(200).json({ validation });
+    }
+
+    if (quoteOnly) {
+      const data = await rateShipment(token, order);
+      const errs = data.response?.errors;
+      if (errs) return res.status(400).json({ error: `UPS ${errs[0]?.code}: ${errs[0]?.message}` });
+      const rs = data.RateResponse?.RatedShipment;
+      const rated = Array.isArray(rs) ? rs[0] : rs;
+      const pub = rated?.TotalCharges;
+      const neg = rated?.NegotiatedRateCharges?.TotalCharge;
+      return res.status(200).json({
+        quote: true,
+        service: 'UPS Standard',
+        publishedRate: pub?.MonetaryValue || null,
+        negotiatedRate: neg?.MonetaryValue || null,
+        rateCurrency: neg?.CurrencyCode || pub?.CurrencyCode || null,
+      });
     }
 
     const result = await createLabel(token, order);

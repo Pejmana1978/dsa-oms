@@ -46,6 +46,30 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
     if (!o.address) { toast('No address on this order', 'error'); return }
     setLabelLoading(prev => ({ ...prev, [o.id]: 'generating' }))
     try {
+      // Step 1: quote only — show the price and let the operator confirm
+      // BEFORE anything is created or billed.
+      const qres = await fetch('/api/ups-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ order: o, quoteOnly: true })
+      })
+      const q = await qres.json()
+      if (q.error) throw new Error(q.error)
+      const lines = [`${o.order_ref} → ${o.customer_name}`, '']
+      if (q.negotiatedRate) {
+        lines.push(`${q.service}: ${q.negotiatedRate} ${q.rateCurrency} (your negotiated rate)`)
+        lines.push(`(published rate would be ${q.publishedRate} ${q.rateCurrency})`)
+      } else if (q.publishedRate) {
+        lines.push(`⚠ ${q.service}: ${q.publishedRate} ${q.rateCurrency} — PUBLISHED rate, your discount is NOT being applied!`)
+      } else {
+        lines.push('UPS returned no price for this shipment.')
+      }
+      lines.push('', 'Create the label?')
+      if (!window.confirm(lines.join('\n'))) {
+        setLabelLoading(prev => ({ ...prev, [o.id]: null }))
+        return
+      }
+      // Step 2: confirmed — create the label for real.
       const res = await fetch('/api/ups-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
