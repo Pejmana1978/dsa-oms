@@ -1,6 +1,6 @@
 // Verifies the duties-payer feature against UPS's TEST environment (CIE).
 // Creates real label requests in the sandbox — no money, no real shipments.
-import { buildShipmentBody } from '/Users/pejmanaltafi/Dropbox/0 Pejman/Claude Projects/seat-cover/dsa-oms/api/ups-label.js';
+import { buildShipmentBody } from '../api/ups-label.js';
 
 const CIE = 'https://wwwcie.ups.com';
 
