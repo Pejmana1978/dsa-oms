@@ -58,20 +58,20 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       const q = await qres.json()
       if (q.error) throw new Error(q.error)
       if (!q.services || q.services.length === 0) throw new Error('UPS returned no services for this address')
-      setQuote({ order: o, services: q.services, chosen: q.services[0].code })
+      setQuote({ order: o, services: q.services, chosen: q.services[0].code, isNonEU: !!q.isNonEU, dutiesPayer: 'receiver' })
     } catch (e) { toast(e.message, 'error') }
     setLabelLoading(prev => ({ ...prev, [o.id]: null }))
   }
 
   // Step 2: operator picked a service and confirmed — create the label.
-  async function createLabelNow(o, serviceCode) {
+  async function createLabelNow(o, serviceCode, dutiesPayer) {
     setQuote(null)
     setLabelLoading(prev => ({ ...prev, [o.id]: 'generating' }))
     try {
       const res = await fetch('/api/ups-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({ order: o, serviceCode })
+        body: JSON.stringify({ order: o, serviceCode, dutiesPayer })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -84,6 +84,11 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
         toast(`Label created — ${data.trackingNumber} · ⚠ ${data.publishedRate} ${data.rateCurrency} — account discount NOT applied!`, 'error')
       } else {
         toast('Label created — tracking: ' + data.trackingNumber)
+      }
+      if (data.dutiesPayer) {
+        toast(data.dutiesPayer === 'sender'
+          ? 'Import duties billed to OUR UPS account'
+          : 'Import duties will be collected from the customer')
       }
       if (data.customs) {
         if (data.customs.emailed) toast('Customs invoice emailed to UPS — copy in Gmail Sent folder')
@@ -319,9 +324,33 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
               )
             })}
             <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>Prices include fuel surcharge, exclude VAT/duties. Nothing is created until you confirm.</div>
+            {quote.isNonEU && (
+              <div style={{ marginTop: 14, borderTop: '1px solid #e0ddd8', paddingTop: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>Import duties &amp; taxes (outside EU)</div>
+                <div style={{ fontSize: 10, color: '#888', marginBottom: 8 }}>Who pays the destination country's customs charges</div>
+                {[
+                  { key: 'receiver', label: 'Customer pays', hint: 'UPS collects from them before delivery (standard)' },
+                  { key: 'sender', label: 'We pay', hint: 'Billed to our UPS account — customer is never charged' },
+                ].map(opt => (
+                  <label key={opt.key} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, marginBottom: 6, cursor: 'pointer',
+                    border: quote.dutiesPayer === opt.key ? '2px solid #185FA5' : '1px solid #e0ddd8',
+                    background: quote.dutiesPayer === opt.key ? '#F0F7FF' : '#fafaf9'
+                  }}>
+                    <input type="radio" name="ups-duties" style={{ flexShrink: 0, width: 16, height: 16, cursor: 'pointer' }}
+                      checked={quote.dutiesPayer === opt.key}
+                      onChange={() => setQuote(prev => ({ ...prev, dutiesPayer: opt.key }))} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{opt.label}</span>
+                      <span style={{ fontSize: 11, color: '#888' }}>{opt.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <Btn onClick={() => setQuote(null)}>Cancel</Btn>
-              <Btn variant="primary" onClick={() => createLabelNow(quote.order, quote.chosen)}>
+              <Btn variant="primary" onClick={() => createLabelNow(quote.order, quote.chosen, quote.dutiesPayer)}>
                 Create label — {(quote.services.find(s => s.code === quote.chosen) || {}).negotiatedRate || (quote.services.find(s => s.code === quote.chosen) || {}).publishedRate} {(quote.services.find(s => s.code === quote.chosen) || {}).currency}
               </Btn>
             </div>

@@ -114,10 +114,27 @@ async function rateShipment(token, order) {
   return await res.json();
 }
 
-async function createLabel(token, order, serviceCode) {
+// Who pays the destination country's import duties & taxes on a non-EU
+// shipment. 'receiver' (DAP) = UPS bills the customer on delivery — the
+// default and what every past label used. 'sender' (DDP) = billed to our
+// own UPS account so the customer is never asked for money.
+export const DUTIES_PAYERS = ['receiver', 'sender'];
+
+export function buildShipmentBody(order, serviceCode, dutiesPayer = 'receiver') {
   const { countryCode, postcode, city, street: addressLine } = parseShipAddress(order.address);
   const isNonEU = !EU_COUNTRIES.includes(countryCode);
   const service = SERVICE_NAMES[serviceCode] ? serviceCode : '11';
+  const account = process.env.UPS_ACCOUNT_NUMBER;
+
+  // Type 01 = transportation (always ours). Type 02 = duties & taxes, and it
+  // must be OMITTED for receiver-pays — sending it with BillReceiver but no
+  // receiver account is what UPS rejects.
+  const shipmentCharges = [
+    { Type: '01', BillShipper: { AccountNumber: account } },
+  ];
+  if (isNonEU && dutiesPayer === 'sender') {
+    shipmentCharges.push({ Type: '02', BillShipper: { AccountNumber: account } });
+  }
 
   const shipmentBody = {
     ShipmentRequest: {
@@ -147,12 +164,7 @@ async function createLabel(token, order, serviceCode) {
             CountryCode: countryCode
           }
         },
-        PaymentInformation: {
-          ShipmentCharge: {
-            Type: '01',
-            BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER }
-          }
-        },
+        PaymentInformation: { ShipmentCharge: shipmentCharges },
         // NOTE: must be ShipmentRatingOptions — the old RateInformation field is
         // silently ignored by the REST API, which billed published rates.
         ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
@@ -208,8 +220,12 @@ async function createLabel(token, order, serviceCode) {
       }
     }
   };
+  return shipmentBody;
+}
 
-  const res = await fetch('https://onlinetools.ups.com/api/shipments/v1/ship', {
+async function createLabel(token, order, serviceCode, dutiesPayer, baseUrl = 'https://onlinetools.ups.com') {
+  const shipmentBody = buildShipmentBody(order, serviceCode, dutiesPayer);
+  const res = await fetch(`${baseUrl}/api/shipments/v1/ship`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(shipmentBody)
@@ -268,7 +284,7 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   if (!(await requireUser(req, res))) return;
-  const { order, validateOnly, quoteOnly, serviceCode } = req.body;
+  const { order, validateOnly, quoteOnly, serviceCode, dutiesPayer } = req.body;
   const parsed = parseShipAddress(order?.address);
   if (!parsed.countryCode) {
     return res.status(400).json({ error: `Can't read the country from the address — the last line must be a 2-letter code or country name (got "${parsed.last}")` });
@@ -300,10 +316,12 @@ export default async function handler(req, res) {
       }).sort((a, b) =>
         parseFloat(a.negotiatedRate ?? a.publishedRate ?? '9e9') - parseFloat(b.negotiatedRate ?? b.publishedRate ?? '9e9')
       );
-      return res.status(200).json({ quote: true, services });
+      // Tell the UI whether to offer the duties choice at all (EU = no customs).
+      return res.status(200).json({ quote: true, services, isNonEU: !EU_COUNTRIES.includes(parsed.countryCode) });
     }
 
-    const result = await createLabel(token, order, serviceCode);
+    const payer = DUTIES_PAYERS.includes(dutiesPayer) ? dutiesPayer : 'receiver';
+    const result = await createLabel(token, order, serviceCode, payer);
     if (result.response?.errors) {
       return res.status(400).json({ error: result.response.errors[0]?.message || 'UPS error' });
     }
@@ -341,6 +359,7 @@ export default async function handler(req, res) {
       publishedRate: published?.MonetaryValue || null,
       rateCurrency: negotiated?.CurrencyCode || published?.CurrencyCode || null,
       customs,
+      dutiesPayer: isNonEU ? payer : null,
     });
   } catch (e) {
     return res.status(500).json({ error: e.message });
