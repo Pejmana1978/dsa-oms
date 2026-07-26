@@ -58,7 +58,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       const q = await qres.json()
       if (q.error) throw new Error(q.error)
       if (!q.services || q.services.length === 0) throw new Error('UPS returned no services for this address')
-      setQuote({ order: o, services: q.services, chosen: q.services[0].code, isNonEU: !!q.isNonEU, dutiesPayer: 'receiver' })
+      setQuote({ order: o, services: q.services, servicesDdp: q.servicesDdp || null, chosen: q.services[0].code, isNonEU: !!q.isNonEU, dutiesPayer: 'receiver' })
     } catch (e) { toast(e.message, 'error') }
     setLabelLoading(prev => ({ ...prev, [o.id]: null }))
   }
@@ -163,6 +163,24 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
   function handleUpdated(updated) {
     setOrders(prev => prev.map(x => x.id === updated.id ? updated : x))
     setSelected(null)
+  }
+
+  // Prices depend on who pays duties: DDP carries UPS's duty-forwarding fee.
+  function activeServices(q) {
+    return (q.dutiesPayer === 'sender' && q.servicesDdp) ? q.servicesDdp : q.services
+  }
+  function chosenService(q) {
+    return activeServices(q).find(s => s.code === q.chosen) || {}
+  }
+  // Extra UPS handling fee for the currently chosen service when WE pay duties.
+  function ddpSurcharge(q) {
+    if (!q.servicesDdp) return null
+    const dap = q.services.find(s => s.code === q.chosen)
+    const ddp = q.servicesDdp.find(s => s.code === q.chosen)
+    const a = parseFloat(dap?.negotiatedRate ?? dap?.publishedRate)
+    const b = parseFloat(ddp?.negotiatedRate ?? ddp?.publishedRate)
+    if (!isFinite(a) || !isFinite(b)) return null
+    return { diff: (b - a).toFixed(2), currency: ddp?.currency || dap?.currency || '' }
   }
 
   return (
@@ -295,7 +313,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
           <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 480, width: '92%' }}>
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Choose UPS service</div>
             <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>{quote.order.order_ref} → {quote.order.customer_name}</div>
-            {quote.services.map(s => {
+            {activeServices(quote).map(s => {
               const etaDate = s.etaDate && s.etaDate.length === 8 ? `${s.etaDate.slice(6, 8)}/${s.etaDate.slice(4, 6)}` : null
               const etaDays = s.etaDays ? `${s.etaDays} business day${String(s.etaDays) === '1' ? '' : 's'}` : null
               const eta = [etaDate, etaDays && (etaDate ? `(${etaDays})` : etaDays)].filter(Boolean).join(' ')
@@ -331,7 +349,9 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
                 {[
                   { key: 'receiver', label: 'Customer pays', hint: 'UPS collects from them before delivery (standard)' },
                   { key: 'sender', label: 'We pay', hint: 'Billed to our UPS account — customer is never charged' },
-                ].map(opt => (
+                ].map(opt => {
+                  const sur = opt.key === 'sender' ? ddpSurcharge(quote) : null
+                  return (
                   <label key={opt.key} style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, marginBottom: 6, cursor: 'pointer',
                     border: quote.dutiesPayer === opt.key ? '2px solid #185FA5' : '1px solid #e0ddd8',
@@ -344,14 +364,23 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
                       <span style={{ fontSize: 13, fontWeight: 600, display: 'block' }}>{opt.label}</span>
                       <span style={{ fontSize: 11, color: '#888' }}>{opt.hint}</span>
                     </span>
+                    {sur && Number(sur.diff) > 0 && (
+                      <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: '#d97706' }}>+{sur.diff} {sur.currency}</span>
+                    )}
                   </label>
-                ))}
+                  )
+                })}
+                {quote.dutiesPayer === 'sender' && (
+                  <div style={{ fontSize: 10, color: '#92400E', background: '#FFFBEB', border: '1px solid #F59E0B', borderRadius: 6, padding: '6px 9px' }}>
+                    The price above includes UPS's duty-forwarding fee only. The actual import VAT/duty on the goods is invoiced to us separately by UPS afterwards.
+                  </div>
+                )}
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
               <Btn onClick={() => setQuote(null)}>Cancel</Btn>
               <Btn variant="primary" onClick={() => createLabelNow(quote.order, quote.chosen, quote.dutiesPayer)}>
-                Create label — {(quote.services.find(s => s.code === quote.chosen) || {}).negotiatedRate || (quote.services.find(s => s.code === quote.chosen) || {}).publishedRate} {(quote.services.find(s => s.code === quote.chosen) || {}).currency}
+                Create label — {chosenService(quote).negotiatedRate || chosenService(quote).publishedRate} {chosenService(quote).currency}
               </Btn>
             </div>
           </div>

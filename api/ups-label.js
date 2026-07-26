@@ -73,8 +73,14 @@ const SERVICE_NAMES = {
 // Price the exact same shipment the label would create, across ALL available
 // services ("Shop") — used for the choose-and-confirm step. Nothing is
 // created or billed by this call.
-async function rateShipment(token, order) {
+async function rateShipment(token, order, ddp = false) {
   const { countryCode, postcode, city, street } = parseShipAddress(order.address);
+  const isNonEU = !EU_COUNTRIES.includes(countryCode);
+  const account = process.env.UPS_ACCOUNT_NUMBER;
+  // Billing duties to us (DDP) adds UPS's duty-forwarding fee to the quote,
+  // so the two terms must be priced separately.
+  const charges = [{ Type: '01', BillShipper: { AccountNumber: account } }];
+  if (ddp && isNonEU) charges.push({ Type: '02', BillShipper: { AccountNumber: account } });
   const body = {
     RateRequest: {
       Request: { TransactionReference: { CustomerContext: String(order.order_ref || 'quote') } },
@@ -86,7 +92,7 @@ async function rateShipment(token, order) {
         },
         ShipTo: { Name: order.customer_name || 'Customer', Address: { AddressLine: street, City: city, PostalCode: postcode, CountryCode: countryCode } },
         ShipFrom: { Name: 'DSA Auto Seat Factory AB', Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' } },
-        PaymentDetails: { ShipmentCharge: { Type: '01', BillShipper: { AccountNumber: process.env.UPS_ACCOUNT_NUMBER } } },
+        PaymentDetails: { ShipmentCharge: charges },
         ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
         // Ask UPS for time-in-transit so the picker can show estimated delivery.
         DeliveryTimeInformation: {
@@ -298,26 +304,35 @@ export default async function handler(req, res) {
     }
 
     if (quoteOnly) {
-      const data = await rateShipment(token, order);
-      const errs = data.response?.errors;
-      if (errs) return res.status(400).json({ error: `UPS ${errs[0]?.code}: ${errs[0]?.message}` });
-      const rs = data.RateResponse?.RatedShipment;
-      const services = (Array.isArray(rs) ? rs : [rs]).filter(Boolean).map(r => {
-        const eta = r.TimeInTransit?.ServiceSummary?.EstimatedArrival
-        return {
-          code: r.Service?.Code,
-          name: SERVICE_NAMES[r.Service?.Code] || ('UPS service ' + r.Service?.Code),
-          publishedRate: r.TotalCharges?.MonetaryValue || null,
-          negotiatedRate: r.NegotiatedRateCharges?.TotalCharge?.MonetaryValue || null,
-          currency: r.NegotiatedRateCharges?.TotalCharge?.CurrencyCode || r.TotalCharges?.CurrencyCode || null,
-          etaDate: eta?.Arrival?.Date || null,          // YYYYMMDD
-          etaDays: eta?.BusinessDaysInTransit || r.GuaranteedDelivery?.BusinessDaysInTransit || null,
-        }
-      }).sort((a, b) =>
-        parseFloat(a.negotiatedRate ?? a.publishedRate ?? '9e9') - parseFloat(b.negotiatedRate ?? b.publishedRate ?? '9e9')
-      );
-      // Tell the UI whether to offer the duties choice at all (EU = no customs).
-      return res.status(200).json({ quote: true, services, isNonEU: !EU_COUNTRIES.includes(parsed.countryCode) });
+      const isNonEU = !EU_COUNTRIES.includes(parsed.countryCode);
+      const parseServices = (data) => {
+        const errs = data.response?.errors;
+        if (errs) throw new Error(`UPS ${errs[0]?.code}: ${errs[0]?.message}`);
+        const rs = data.RateResponse?.RatedShipment;
+        return (Array.isArray(rs) ? rs : [rs]).filter(Boolean).map(r => {
+          const eta = r.TimeInTransit?.ServiceSummary?.EstimatedArrival;
+          return {
+            code: r.Service?.Code,
+            name: SERVICE_NAMES[r.Service?.Code] || ('UPS service ' + r.Service?.Code),
+            publishedRate: r.TotalCharges?.MonetaryValue || null,
+            negotiatedRate: r.NegotiatedRateCharges?.TotalCharge?.MonetaryValue || null,
+            currency: r.NegotiatedRateCharges?.TotalCharge?.CurrencyCode || r.TotalCharges?.CurrencyCode || null,
+            etaDate: eta?.Arrival?.Date || null,          // YYYYMMDD
+            etaDays: eta?.BusinessDaysInTransit || r.GuaranteedDelivery?.BusinessDaysInTransit || null,
+          };
+        }).sort((a, b) =>
+          parseFloat(a.negotiatedRate ?? a.publishedRate ?? '9e9') - parseFloat(b.negotiatedRate ?? b.publishedRate ?? '9e9')
+        );
+      };
+      // Outside the EU, price BOTH duty terms up front (DDP carries UPS's
+      // duty-forwarding fee) so switching the choice updates instantly.
+      const [dapData, ddpData] = await Promise.all([
+        rateShipment(token, order, false),
+        isNonEU ? rateShipment(token, order, true) : Promise.resolve(null),
+      ]);
+      const services = parseServices(dapData);
+      const servicesDdp = ddpData ? parseServices(ddpData) : null;
+      return res.status(200).json({ quote: true, services, servicesDdp, isNonEU });
     }
 
     const payer = DUTIES_PAYERS.includes(dutiesPayer) ? dutiesPayer : 'receiver';
