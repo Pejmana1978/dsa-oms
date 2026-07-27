@@ -6,9 +6,11 @@ import OrderModal from '../components/OrderModal'
 import { getOrderItems, itemThumb } from '../lib/orderItems'
 import { OVERDUE_DAYS, daysWaiting, isOverdue, isUsTeamOrder } from '../lib/usOrders'
 
-// Safeguard view: US/Canada website orders handed to the US team (Juan) for
-// fulfilment in ShipStation. Nothing here is produced or shipped by us — the
-// page exists so an unshipped order can never quietly disappear.
+// Safeguard view: US/Canada website orders handed to the US team (Juan), who
+// fulfils them in ShipStation and marks them Completed in WooCommerce — he
+// never uses this OMS. So rows close THEMSELVES on the next sync once Woo says
+// completed; the buttons below are only a manual override. The page exists so
+// an order nobody shipped can't quietly disappear.
 export default function UsOrdersPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
   const [showShipped, setShowShipped] = useState(false)
@@ -67,13 +69,14 @@ export default function UsOrdersPage({ orders, setOrders, role }) {
 
       {overdue.length > 0 && (
         <div style={{ background: '#FDECEC', border: '1px solid #E24B4A', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#A32D2D', fontWeight: 600 }}>
-          ⚠ {overdue.length} order{overdue.length !== 1 ? 's have' : ' has'} been waiting {OVERDUE_DAYS} days or more — check with Juan that {overdue.length !== 1 ? 'they were' : 'it was'} shipped.
+          ⚠ {overdue.length} order{overdue.length !== 1 ? 's have' : ' has'} been waiting {OVERDUE_DAYS} days or more and {overdue.length !== 1 ? 'are' : 'is'} still not completed in WooCommerce — check with Juan that {overdue.length !== 1 ? 'they were' : 'it was'} shipped.
         </div>
       )}
 
       {list.length === 0 && (
         <div style={{ background: '#fff', border: '1px solid #e0ddd8', borderRadius: 10, padding: 32, textAlign: 'center', fontSize: 12, color: '#bbb' }}>
           Nothing waiting on the US team 🎉
+          <div style={{ fontSize: 11, marginTop: 6 }}>Orders close automatically once Juan marks them Completed in WooCommerce.</div>
         </div>
       )}
 
@@ -130,10 +133,10 @@ export default function UsOrdersPage({ orders, setOrders, role }) {
             </div>
 
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 10, flexWrap: 'wrap' }}>
-              <label style={{ fontSize: 11, color: '#888' }}>Tracking (optional)</label>
+              <label style={{ fontSize: 11, color: '#888' }}>Tracking</label>
               <input
                 defaultValue={o.tracking_number || ''}
-                placeholder="paste tracking from Juan"
+                placeholder="pulled from WooCommerce automatically"
                 onBlur={e => saveTracking(o, e.target.value.trim())}
                 style={{ width: 220, fontSize: 12 }}
               />

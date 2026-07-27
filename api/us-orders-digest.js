@@ -33,6 +33,25 @@ export default async function handler(req, res) {
       process.env.REACT_APP_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
+
+    // Sync WooCommerce FIRST. Juan fulfils in ShipStation and marks the order
+    // Completed in WooCommerce — he never touches the OMS — so without this the
+    // warning would fire on orders that have long since shipped.
+    let synced = null;
+    try {
+      const r = await fetch(process.env.REACT_APP_SUPABASE_URL + '/functions/v1/woo-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+        body: '{}',
+      });
+      synced = await r.json();
+    } catch (e) {
+      synced = { error: e.message };   // warn anyway — better a false alarm than silence
+    }
+
     const { data, error } = await supabase
       .from('orders')
       .select('id, order_ref, customer_name, address, order_date, created_at, us_status, us_sent_at, us_overdue_notified_at')
@@ -49,7 +68,7 @@ export default async function handler(req, res) {
 
     if (toWarn.length === 0) {
       return res.status(200).json({
-        sent: false, open: open.length, overdue: overdue.length,
+        sent: false, synced, open: open.length, overdue: overdue.length,
         reason: overdue.length ? 'already warned about these' : 'nothing overdue',
       });
     }
@@ -107,7 +126,7 @@ export default async function handler(req, res) {
       .update({ us_overdue_notified_at: new Date().toISOString() })
       .in('id', toWarn.map(o => o.id));
 
-    return res.status(200).json({ sent: true, open: open.length, overdue: overdue.length, warned: toWarn.length });
+    return res.status(200).json({ sent: true, synced, open: open.length, overdue: overdue.length, warned: toWarn.length });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

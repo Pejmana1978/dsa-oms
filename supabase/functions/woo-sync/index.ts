@@ -54,6 +54,27 @@ function wooHeaders() {
   return h
 }
 
+// Juan types the tracking number into WooCommerce (never into the OMS), so
+// pull it back out. Different tracking plugins store it under different meta
+// keys, so scan for anything tracking-shaped rather than hardcoding one.
+function extractTracking(o: any): string {
+  for (const m of (o.meta_data || [])) {
+    const key = String(m?.key || "").toLowerCase()
+    if (!key.includes("tracking")) continue
+    const v = m.value
+    if (typeof v === "string" && v.trim()) return v.trim()
+    if (Array.isArray(v) && v.length) {
+      const t = v[0]?.tracking_number ?? v[0]?.trackingNumber
+      if (t) return String(t).trim()
+    }
+    if (v && typeof v === "object") {
+      const t = (v as any).tracking_number ?? (v as any).trackingNumber
+      if (t) return String(t).trim()
+    }
+  }
+  return ""
+}
+
 async function wooFetch(path: string) {
   const res = await fetch(`${WOO_URL}/wp-json/wc/v3${path}`, {
     headers: wooHeaders(),
@@ -175,12 +196,37 @@ serve(async () => {
       if (!error) { imported++; if (isUsTeam) importedUsCa++ }
     }
 
-    // Reconcile: active Website orders that were cancelled/refunded in Woo.
+    // Reconcile: active Website orders that changed state in Woo.
     const { data: activeWeb } = await supabase
       .from("orders")
-      .select("id, order_ref, refund_amount, sale_amount")
+      .select("id, order_ref, refund_amount, sale_amount, fulfillment_team, us_status, woo_completed_at, tracking_number")
       .eq("source", "Website")
       .eq("archived", false)
+
+    // Completed in WooCommerce = the order really shipped. The US team (Juan)
+    // often marks it Completed in the Woo backend instead of entering tracking
+    // in the OMS, so treat that as proof of shipment and close the watchlist
+    // entry — otherwise the 5-day warning would fire on an order already gone.
+    let usAutoShipped = 0
+    const completedWoo = await wooFetchAll("status=completed", 5)
+    for (const o of completedWoo) {
+      const existing = activeWeb?.find((x: any) => x.order_ref === String(o.number))
+      if (!existing) continue
+      const patch: Record<string, unknown> = {}
+      // Woo already says completed — never write the status back to it again.
+      if (!existing.woo_completed_at) patch.woo_completed_at = new Date().toISOString()
+      if (existing.fulfillment_team === "us_team" && existing.us_status !== "shipped") {
+        patch.us_status = "shipped"
+        patch.us_shipped_at = new Date().toISOString()
+      }
+      // Bring Juan's tracking number across so it's visible in the OMS too.
+      const tracking = extractTracking(o)
+      if (tracking && !existing.tracking_number) patch.tracking_number = tracking
+      if (Object.keys(patch).length > 0) {
+        await supabase.from("orders").update(patch).eq("id", existing.id)
+        if (patch.us_status) usAutoShipped++
+      }
+    }
 
     let cancelled = 0
     let refunded = 0
@@ -201,7 +247,7 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, cancelled, refunded, total: wooOrders.length }), {
+    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, usAutoShipped, cancelled, refunded, total: wooOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {
