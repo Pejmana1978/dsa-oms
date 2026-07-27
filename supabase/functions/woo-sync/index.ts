@@ -75,6 +75,30 @@ function extractTracking(o: any): string {
   return ""
 }
 
+// The shop records each item's real options as product attributes (Colour /
+// Position / Seat Side) — far more reliable than parsing them out of the
+// product title, which is all the eBay side can do.
+function specFromLineItem(li: any) {
+  const attrs: Record<string, string> = {}
+  for (const m of (li.meta_data || [])) {
+    const k = String(m?.display_key || m?.key || "").trim().toLowerCase()
+    const v = String(m?.display_value ?? m?.value ?? "").trim()
+    if (k && v && !k.startsWith("_")) attrs[k] = v
+  }
+  const split = (s: string) => s.split(/[,&+/]|\band\b/i).map(x => x.trim()).filter(Boolean)
+  const color = attrs["colour"] || attrs["color"] || ""
+  const seats = attrs["position"] ? split(attrs["position"]) : []      // Bottom / Top
+  const sides = attrs["seat side"] ? split(attrs["seat side"]) : []    // Driver / Passenger
+  const position: string[] = []
+  for (const side of (sides.length ? sides : [""])) {
+    for (const seat of (seats.length ? seats : [""])) {
+      const label = [side, seat].filter(Boolean).join(" ")
+      if (label) position.push(label)
+    }
+  }
+  return { color, position }
+}
+
 async function wooFetch(path: string) {
   const res = await fetch(`${WOO_URL}/wp-json/wc/v3${path}`, {
     headers: wooHeaders(),
@@ -141,6 +165,7 @@ serve(async () => {
           } catch { /* thumbnail is nice-to-have */ }
         }
         const spec = parseSpec(li.name || "")
+        const attr = specFromLineItem(li)   // structured attributes win
         itemsDetail.push({
           title: li.name || "",
           quantity: Number(li.quantity) || 1,
@@ -153,10 +178,10 @@ serve(async () => {
           car: spec.car,
           vin: "",
           year: "",
-          position: spec.position,
+          position: attr.position.length ? attr.position : spec.position,
           position_other: "",
           material: spec.material,
-          color: spec.color,
+          color: attr.color || spec.color,
           item_notes: "",
         })
       }
