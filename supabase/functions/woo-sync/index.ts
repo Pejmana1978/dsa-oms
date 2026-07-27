@@ -41,10 +41,22 @@ function parseSpec(title: string) {
   return { car, position, material, color }
 }
 
+// Cloudberry's firewall blocks /wp-json/wc/v3/ except for requests carrying
+// this shared secret header (agreed with Kamal, 2026-07-23) — it is what gets
+// the OMS through, in addition to the WooCommerce key/secret.
+const OMS_AUTH = Deno.env.get("WOO_OMS_AUTH_TOKEN") || ""
+
+function wooHeaders() {
+  const h: Record<string, string> = {
+    "Authorization": `Basic ${btoa(`${WOO_KEY}:${WOO_SECRET}`)}`,
+  }
+  if (OMS_AUTH) h["X-OMS-Auth"] = OMS_AUTH
+  return h
+}
+
 async function wooFetch(path: string) {
-  const auth = btoa(`${WOO_KEY}:${WOO_SECRET}`)
   const res = await fetch(`${WOO_URL}/wp-json/wc/v3${path}`, {
-    headers: { "Authorization": `Basic ${auth}` },
+    headers: wooHeaders(),
   })
   if (!res.ok) throw new Error(`WooCommerce ${res.status}: ${(await res.text()).slice(0, 200)}`)
   return await res.json()

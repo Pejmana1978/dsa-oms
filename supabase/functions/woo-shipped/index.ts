@@ -15,8 +15,14 @@ serve(async (req) => {
     if (!wooOrderId) {
       return new Response(JSON.stringify({ error: "wooOrderId is required" }), { status: 400 })
     }
-    const auth = btoa(`${WOO_KEY}:${WOO_SECRET}`)
-    const headers = { "Authorization": `Basic ${auth}`, "Content-Type": "application/json" }
+    // X-OMS-Auth is the shared secret Cloudberry's firewall allowlists for
+    // /wp-json/wc/v3/ — without it the request never reaches WooCommerce.
+    const omsAuth = Deno.env.get("WOO_OMS_AUTH_TOKEN") || ""
+    const headers: Record<string, string> = {
+      "Authorization": `Basic ${btoa(`${WOO_KEY}:${WOO_SECRET}`)}`,
+      "Content-Type": "application/json",
+    }
+    if (omsAuth) headers["X-OMS-Auth"] = omsAuth
 
     const res = await fetch(`${WOO_URL}/wp-json/wc/v3/orders/${wooOrderId}`, {
       method: "PUT",
