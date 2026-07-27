@@ -14,6 +14,29 @@ const COUNTRY_NAME_TO_CODE = {
   'australia': 'AU', 'new zealand': 'NZ', 'united states': 'US', 'usa': 'US', 'canada': 'CA', 'japan': 'JP',
 };
 
+// UPS field limits (Shipping API): each address line max 35 chars, up to 3
+// lines; name/attention 35; city 30; postcode 9. Anything longer is rejected
+// outright — e.g. "3 Perth Close (No 4 if not in), Micklover, Derby" (47).
+const UPS_LINE = 35;
+
+function addressLines(street) {
+  const words = String(street || '').trim().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const word = w.length > UPS_LINE ? w.slice(0, UPS_LINE) : w;
+    if (!cur) { cur = word; continue; }
+    if ((cur + ' ' + word).length <= UPS_LINE) { cur += ' ' + word; continue; }
+    lines.push(cur);
+    cur = word;
+    if (lines.length === 3) { cur = ''; break; }   // UPS accepts at most 3
+  }
+  if (cur && lines.length < 3) lines.push(cur);
+  return lines.length ? lines : [''];
+}
+
+const cap = (s, n) => String(s == null ? '' : s).trim().slice(0, n);
+
 function parseShipAddress(address) {
   const parts = (address || '').split(',').map(s => s.trim()).filter(Boolean);
   const last = parts[parts.length - 1] || '';
@@ -50,9 +73,9 @@ async function validateAddress(token, address) {
     body: JSON.stringify({
       XAVRequest: {
         AddressKeyFormat: {
-          AddressLine: street,
-          PoliticalDivision2: city,
-          PostcodePrimaryLow: postcode,
+          AddressLine: addressLines(street),
+          PoliticalDivision2: cap(city, 30),
+          PostcodePrimaryLow: cap(postcode, 9),
           CountryCode: countryCode
         }
       }
@@ -90,7 +113,7 @@ async function rateShipment(token, order, ddp = false) {
           ShipperNumber: process.env.UPS_ACCOUNT_NUMBER,
           Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' }
         },
-        ShipTo: { Name: order.customer_name || 'Customer', Address: { AddressLine: street, City: city, PostalCode: postcode, CountryCode: countryCode } },
+        ShipTo: { Name: cap(order.customer_name || 'Customer', 35), Address: { AddressLine: addressLines(street), City: cap(city, 30), PostalCode: cap(postcode, 9), CountryCode: countryCode } },
         ShipFrom: { Name: 'DSA Auto Seat Factory AB', Address: { AddressLine: 'Killingevägen 32', City: 'Lidingö', PostalCode: '18164', CountryCode: 'SE' } },
         PaymentDetails: { ShipmentCharge: charges },
         ShipmentRatingOptions: { NegotiatedRatesIndicator: 'X' },
@@ -160,13 +183,13 @@ export function buildShipmentBody(order, serviceCode, dutiesPayer = 'receiver') 
           }
         },
         ShipTo: {
-          Name: order.customer_name,
-          AttentionName: order.customer_name,
+          Name: cap(order.customer_name || 'Customer', 35),
+          AttentionName: cap(order.customer_name || 'Customer', 35),
           Phone: { Number: order.phone || '' },
           Address: {
-            AddressLine: addressLine,
-            City: city,
-            PostalCode: postcode,
+            AddressLine: addressLines(addressLine),
+            City: cap(city, 30),
+            PostalCode: cap(postcode, 9),
             CountryCode: countryCode
           }
         },
@@ -199,13 +222,13 @@ export function buildShipmentBody(order, serviceCode, dutiesPayer = 'receiver') 
             CurrencyCode: 'USD',
             Contacts: {
               SoldTo: {
-                Name: String(order.customer_name || 'Customer').slice(0, 35),
-                AttentionName: String(order.customer_name || 'Customer').slice(0, 35),
+                Name: cap(order.customer_name || 'Customer', 35),
+                AttentionName: cap(order.customer_name || 'Customer', 35),
                 Phone: { Number: order.phone || '0000000000' },
                 Address: {
-                  AddressLine: addressLine,
-                  City: city,
-                  PostalCode: postcode,
+                  AddressLine: addressLines(addressLine),
+                  City: cap(city, 30),
+                  PostalCode: cap(postcode, 9),
                   CountryCode: countryCode
                 }
               }
