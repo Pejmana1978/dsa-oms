@@ -1,7 +1,7 @@
-// Safeguard warning: emails ONCE when a US/Canada order crosses the 5-day
-// unshipped mark — not every day. Each order is warned about a single time
-// (us_overdue_notified_at); the OMS page keeps showing it in red until it's
-// marked shipped, so the standing reminder lives there, not in the inbox.
+// Safeguard reminder: emails EVERY DAY for as long as a US/Canada order has
+// been unshipped for 5+ days, and stops the day it's resolved. Orders under
+// 5 days are never mentioned, so an email always means "something needs
+// chasing" — and it keeps arriving until it's actually done.
 //
 // Runs on a Vercel cron (see vercel.json). Cron requests carry no user session,
 // so they authenticate with CRON_SECRET instead.
@@ -62,14 +62,12 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     const open = data || [];
-    const overdue = open.filter(o => daysWaiting(o) >= OVERDUE_DAYS);
-    // Only warn about orders not already warned about — one email per order.
-    const toWarn = overdue.filter(o => !o.us_overdue_notified_at);
+    // Every order 5+ days unshipped, reminded about daily until it's resolved.
+    const toWarn = open.filter(o => daysWaiting(o) >= OVERDUE_DAYS);
 
     if (toWarn.length === 0) {
       return res.status(200).json({
-        sent: false, synced, open: open.length, overdue: overdue.length,
-        reason: overdue.length ? 'already warned about these' : 'nothing overdue',
+        sent: false, synced, open: open.length, overdue: 0, reason: 'nothing overdue',
       });
     }
 
@@ -80,6 +78,9 @@ export default async function handler(req, res) {
         <td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(o.address)}</td>
         <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#c00;font-weight:bold">${daysWaiting(o)} days</td>
         <td style="padding:6px 10px;border-bottom:1px solid #eee">${o.us_status === 'sent' ? 'sent to Juan' : 'not sent yet'}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#888">${
+          o.us_overdue_notified_at ? 'since ' + String(o.us_overdue_notified_at).slice(0, 10) : 'first flagged today'
+        }</td>
       </tr>`).join('');
 
     const html = `
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
             <th style="text-align:left;padding:6px 10px">Ship to</th>
             <th style="text-align:left;padding:6px 10px">Waiting</th>
             <th style="text-align:left;padding:6px 10px">Status</th>
+            <th style="text-align:left;padding:6px 10px">Chasing</th>
           </tr>
           ${rows}
         </table>
@@ -101,7 +103,7 @@ export default async function handler(req, res) {
           <a href="https://seatcover-oms.vercel.app" style="color:#185FA5">Open the OMS → US / Canada (Juan)</a>
         </p>
         <p style="color:#888;font-size:11px">${open.length} US/CA order${open.length !== 1 ? 's are' : ' is'} open in total.
-        You only get this warning once per order — the OMS page keeps showing it in red until it's marked shipped.</p>
+        This reminder repeats every day until the order is completed in WooCommerce — orders under ${OVERDUE_DAYS} days are never listed.</p>
       </div>`;
 
     const to = process.env.GMAIL_USER || process.env.SENDER_EMAIL;
@@ -119,14 +121,17 @@ export default async function handler(req, res) {
       html,
     });
 
-    // Mark them warned only after the mail actually went out, so a send
-    // failure retries tomorrow instead of silently swallowing the warning.
-    await supabase
-      .from('orders')
-      .update({ us_overdue_notified_at: new Date().toISOString() })
-      .in('id', toWarn.map(o => o.id));
+    // Record when each order was FIRST flagged (not every send) so the email
+    // can show how long it's been chased.
+    const firstTime = toWarn.filter(o => !o.us_overdue_notified_at).map(o => o.id);
+    if (firstTime.length > 0) {
+      await supabase
+        .from('orders')
+        .update({ us_overdue_notified_at: new Date().toISOString() })
+        .in('id', firstTime);
+    }
 
-    return res.status(200).json({ sent: true, synced, open: open.length, overdue: overdue.length, warned: toWarn.length });
+    return res.status(200).json({ sent: true, synced, open: open.length, overdue: toWarn.length });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
