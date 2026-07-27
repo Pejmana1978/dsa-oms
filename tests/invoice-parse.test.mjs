@@ -2,14 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { PDFParse } from 'pdf-parse';
+import { extractText, getDocumentProxy } from 'unpdf';
 import { parseStripeInvoice } from '../api/_invoice.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const buf = readFileSync(join(here, 'fixtures/stripe-invoice-sample.pdf'));
-const parser = new PDFParse({ data: new Uint8Array(buf) });
-const { text } = await parser.getText();
-await parser.destroy?.();
+const pdf = await getDocumentProxy(new Uint8Array(buf));
+const { text } = await extractText(pdf, { mergePages: true });
 const r = parseStripeInvoice(text);
 console.log(JSON.stringify(r, null, 1));
 
