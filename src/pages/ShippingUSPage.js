@@ -4,13 +4,14 @@ import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { isUsTeamOrder } from '../lib/usOrders'
 import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
 
 export default function ShippingUSPage({ orders, setOrders, role }) {
   const [selected, setSelected] = useState(null)
   const toast = useToast()
 
-  const queue = orders.filter(o => o.stage === 'Production Complete')
+  const queue = orders.filter(o => o.stage === 'Production Complete' && !o.archived && !isUsTeamOrder(o))
 
   async function advance(id) {
     const o = orders.find(x => x.id === id)

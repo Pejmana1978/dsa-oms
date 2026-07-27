@@ -5,6 +5,7 @@ import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
+import { isUsTeamOrder } from '../lib/usOrders'
 
 export default function ShippingSwedPage({ orders, setOrders, role, mode = 'sweden' }) {
   const [selected, setSelected] = useState(null)
@@ -16,6 +17,7 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
   const toast = useToast()
 
   const queue = orders.filter(o => {
+    if (isUsTeamOrder(o) || o.archived) return false
     if (mode === 'sweden') return o.stage === 'Shipped to Sweden'
     if (!['Shipped to Customer', 'Delivered'].includes(o.stage)) return false
     if (!showDelivered && o.stage === 'Delivered') return false

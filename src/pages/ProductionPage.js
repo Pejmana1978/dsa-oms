@@ -4,6 +4,7 @@ import { STAGES } from '../lib/constants'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { isUsTeamOrder } from '../lib/usOrders'
 import { getOrderItems, isMultiItem, itemThumb } from '../lib/orderItems'
 import { buildSheetHTML } from '../lib/productionSheet'
 
@@ -24,7 +25,7 @@ export default function ProductionPage({ orders, setOrders, role }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [showLightbox])
 
-  const prod = orders.filter(o => ['Verified', 'In Production', 'Production Complete'].includes(o.stage))
+  const prod = orders.filter(o => ['Verified', 'In Production', 'Production Complete'].includes(o.stage) && !o.archived && !isUsTeamOrder(o))
 
   async function advance(id) {
     const o = orders.find(x => x.id === id)

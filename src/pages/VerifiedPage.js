@@ -4,6 +4,7 @@ import Btn from '../components/Btn'
 import { updateOrder } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
+import { isUsTeamOrder } from '../lib/usOrders'
 import { getOrderItems } from '../lib/orderItems'
 import { buildSheetHTML } from '../lib/productionSheet'
 
@@ -13,7 +14,7 @@ export default function VerifiedPage({ orders, setOrders, role }) {
   const [moving, setMoving] = useState(false)
   const toast = useToast()
 
-  const verified = orders.filter(o => o.stage === 'Verified' && !o.archived)
+  const verified = orders.filter(o => o.stage === 'Verified' && !o.archived && !isUsTeamOrder(o))
   const selectedOrders = verified.filter(o => checked[o.id])
   const allChecked = verified.length > 0 && verified.every(o => checked[o.id])
 

@@ -9,8 +9,11 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("E
 
 // Import website orders created on/after this date — no historical backfill.
 const IMPORT_SINCE = "2026-07-22T00:00:00"
-// DSA OMS is the EU brand: US/Canada web orders are handled outside it.
-const SKIP_COUNTRIES = ["US", "CA"]
+// US/Canada web orders are fulfilled by the US team (Juan) in ShipStation, not
+// through this OMS. They are still IMPORTED — flagged as us_team — purely so
+// nothing can be forgotten: they show on the US/Canada watchlist, never in the
+// production/shipping queues.
+const US_TEAM_COUNTRIES = ["US", "CA"]
 
 // Same title parser as ebay-sync — pre-fills car / position / material / color.
 function parseSpec(title: string) {
@@ -67,11 +70,13 @@ serve(async () => {
     // New paid orders awaiting fulfillment.
     const wooOrders = await wooFetchAll("status=processing")
     let imported = 0
-    let skippedUsCa = 0
+    let importedUsCa = 0
     for (const o of wooOrders) {
+      // Destination country decides the team — SHIPPING address, never billing
+      // (a US customer shipping to Germany is a DSA order, and vice versa).
       const ship = o.shipping?.address_1 ? o.shipping : (o.billing || {})
       const country = String(ship.country || o.billing?.country || "").toUpperCase()
-      if (SKIP_COUNTRIES.includes(country)) { skippedUsCa++; continue }
+      const isUsTeam = US_TEAM_COUNTRIES.includes(country)
       const ref = String(o.number)
       const { data: existing } = await supabase.from("orders").select("id").eq("order_ref", ref).single()
       if (existing) continue
@@ -127,6 +132,8 @@ serve(async () => {
         color: "",
         source: "Website",
         stage: "New",
+        fulfillment_team: isUsTeam ? "us_team" : null,
+        us_status: isUsTeam ? "received" : null,
         notes: o.customer_note || "",
         thumbnail: first.thumbnail || "",
         sale_amount: o.total ? parseFloat(o.total) : null,
@@ -136,7 +143,7 @@ serve(async () => {
         photos: [],
         items: itemsDetail,
       })
-      if (!error) imported++
+      if (!error) { imported++; if (isUsTeam) importedUsCa++ }
     }
 
     // Reconcile: active Website orders that were cancelled/refunded in Woo.
@@ -165,7 +172,7 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, imported, skippedUsCa, cancelled, refunded, total: wooOrders.length }), {
+    return new Response(JSON.stringify({ success: true, imported, importedUsCa, cancelled, refunded, total: wooOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {
