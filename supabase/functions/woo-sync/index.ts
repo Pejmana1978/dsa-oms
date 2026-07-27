@@ -83,6 +83,7 @@ serve(async () => {
     const wooOrders = await wooFetchAll("status=processing")
     let imported = 0
     let importedUsCa = 0
+    let linked = 0        // pre-existing manual orders newly linked to Woo
     for (const o of wooOrders) {
       // Destination country decides the team — SHIPPING address, never billing
       // (a US customer shipping to Germany is a DSA order, and vice versa).
@@ -90,8 +91,24 @@ serve(async () => {
       const country = String(ship.country || o.billing?.country || "").toUpperCase()
       const isUsTeam = US_TEAM_COUNTRIES.includes(country)
       const ref = String(o.number)
-      const { data: existing } = await supabase.from("orders").select("id").eq("order_ref", ref).single()
-      if (existing) continue
+      const { data: existing } = await supabase
+        .from("orders").select("id, woo_order_id, fulfillment_team").eq("order_ref", ref).single()
+      if (existing) {
+        // Orders entered by hand before the sync existed have no woo_order_id,
+        // so the shipped-status write-back to WooCommerce would silently do
+        // nothing. Backfill the link (and the US/CA flag) instead of skipping.
+        const patch: Record<string, unknown> = {}
+        if (!existing.woo_order_id) patch.woo_order_id = o.id
+        if (isUsTeam && !existing.fulfillment_team) {
+          patch.fulfillment_team = "us_team"
+          patch.us_status = "received"
+        }
+        if (Object.keys(patch).length > 0) {
+          await supabase.from("orders").update(patch).eq("id", existing.id)
+          linked++
+        }
+        continue
+      }
 
       const itemsDetail: any[] = []
       for (const li of (o.line_items || [])) {
@@ -184,7 +201,7 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, imported, importedUsCa, cancelled, refunded, total: wooOrders.length }), {
+    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, cancelled, refunded, total: wooOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {

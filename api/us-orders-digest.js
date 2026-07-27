@@ -1,6 +1,7 @@
-// Daily safeguard email: which US/Canada website orders are still unshipped by
-// the US team. Silent when nothing is outstanding — it only speaks up when
-// something needs chasing, so the mail itself means "act".
+// Safeguard warning: emails ONCE when a US/Canada order crosses the 5-day
+// unshipped mark — not every day. Each order is warned about a single time
+// (us_overdue_notified_at); the OMS page keeps showing it in red until it's
+// marked shipped, so the standing reminder lives there, not in the inbox.
 //
 // Runs on a Vercel cron (see vercel.json). Cron requests carry no user session,
 // so they authenticate with CRON_SECRET instead.
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
     );
     const { data, error } = await supabase
       .from('orders')
-      .select('order_ref, customer_name, address, order_date, created_at, us_status, us_sent_at, sale_amount, sale_currency')
+      .select('id, order_ref, customer_name, address, order_date, created_at, us_status, us_sent_at, us_overdue_notified_at')
       .eq('fulfillment_team', 'us_team')
       .eq('archived', false)
       .neq('us_status', 'shipped')
@@ -43,13 +44,17 @@ export default async function handler(req, res) {
 
     const open = data || [];
     const overdue = open.filter(o => daysWaiting(o) >= OVERDUE_DAYS);
+    // Only warn about orders not already warned about — one email per order.
+    const toWarn = overdue.filter(o => !o.us_overdue_notified_at);
 
-    // Nothing outstanding, or nothing overdue → stay quiet.
-    if (overdue.length === 0) {
-      return res.status(200).json({ sent: false, open: open.length, overdue: 0, reason: 'nothing overdue' });
+    if (toWarn.length === 0) {
+      return res.status(200).json({
+        sent: false, open: open.length, overdue: overdue.length,
+        reason: overdue.length ? 'already warned about these' : 'nothing overdue',
+      });
     }
 
-    const rows = overdue.map(o => `
+    const rows = toWarn.map(o => `
       <tr>
         <td style="padding:6px 10px;border-bottom:1px solid #eee"><strong>${esc(o.order_ref)}</strong></td>
         <td style="padding:6px 10px;border-bottom:1px solid #eee">${esc(o.customer_name)}</td>
@@ -60,9 +65,9 @@ export default async function handler(req, res) {
 
     const html = `
       <div style="font-family:Arial,sans-serif;font-size:14px;color:#222">
-        <p><strong>${overdue.length} US/Canada order${overdue.length !== 1 ? 's have' : ' has'} not been marked shipped
+        <p><strong>${toWarn.length} US/Canada order${toWarn.length !== 1 ? 's have' : ' has'} not been marked shipped
         after ${OVERDUE_DAYS}+ days.</strong></p>
-        <p>Please check with Juan that ${overdue.length !== 1 ? 'these were' : 'this was'} fulfilled in ShipStation.</p>
+        <p>Please check with Juan that ${toWarn.length !== 1 ? 'these were' : 'this was'} fulfilled in ShipStation.</p>
         <table style="border-collapse:collapse;font-size:13px;margin-top:10px">
           <tr style="background:#f5f5f4">
             <th style="text-align:left;padding:6px 10px">Order</th>
@@ -77,7 +82,7 @@ export default async function handler(req, res) {
           <a href="https://seatcover-oms.vercel.app" style="color:#185FA5">Open the OMS → US / Canada (Juan)</a>
         </p>
         <p style="color:#888;font-size:11px">${open.length} US/CA order${open.length !== 1 ? 's are' : ' is'} open in total.
-        This email is only sent when something is overdue.</p>
+        You only get this warning once per order — the OMS page keeps showing it in red until it's marked shipped.</p>
       </div>`;
 
     const to = process.env.GMAIL_USER || process.env.SENDER_EMAIL;
@@ -91,11 +96,18 @@ export default async function handler(req, res) {
     await transporter.sendMail({
       from: to,
       to,
-      subject: `⚠ ${overdue.length} US/Canada order${overdue.length !== 1 ? 's' : ''} still unshipped`,
+      subject: `⚠ ${toWarn.length} US/Canada order${toWarn.length !== 1 ? 's' : ''} unshipped after ${OVERDUE_DAYS} days`,
       html,
     });
 
-    return res.status(200).json({ sent: true, open: open.length, overdue: overdue.length });
+    // Mark them warned only after the mail actually went out, so a send
+    // failure retries tomorrow instead of silently swallowing the warning.
+    await supabase
+      .from('orders')
+      .update({ us_overdue_notified_at: new Date().toISOString() })
+      .in('id', toWarn.map(o => o.id));
+
+    return res.status(200).json({ sent: true, open: open.length, overdue: overdue.length, warned: toWarn.length });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
