@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Btn from '../components/Btn'
-import { updateOrder, authHeaders, notifyWooShipped } from '../lib/api'
+import { updateOrder, authHeaders, notifyWooShipped, markWooCompleted } from '../lib/api'
 import { printPackingSlip } from '../lib/printPackingSlip'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
@@ -80,6 +80,8 @@ export default function ShippingSwedPage({ orders, setOrders, role, mode = 'swed
       const updated = await updateOrder(o.id, { tracking_number: data.trackingNumber, label_pdf: data.labelBase64 })
       setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
       downloadPDF(data.labelBase64, data.trackingNumber)
+      // Website order + label made = it's on its way → close it in WooCommerce.
+      markWooCompleted(updated, data.trackingNumber)
       if (data.negotiatedRate) {
         toast(`Label created — ${data.trackingNumber} · ${data.negotiatedRate} ${data.rateCurrency} (discount applied)`)
       } else if (data.publishedRate) {

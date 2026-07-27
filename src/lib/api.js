@@ -79,18 +79,32 @@ export async function updateProfile(id, updates) {
   return data
 }
 
-// When a WEBSITE order ships to the customer, mark it Completed in
-// WooCommerce and leave the tracking number as a customer note.
-// Fire-and-forget — a Woo hiccup must never block the OMS stage change.
-export function notifyWooShipped(order, newStage) {
-  if (order?.source !== 'Website' || newStage !== 'Shipped to Customer' || !order?.woo_order_id) return
+// Mark a WEBSITE order Completed in WooCommerce with a customer-visible
+// tracking note. Called the moment the parcel is genuinely on its way:
+//   EU orders    — when the UPS label is created
+//   US/CA orders — when Juan's tracking number is entered
+// Fire-and-forget, and idempotent server-side (orders.woo_completed_at), so
+// calling it more than once is harmless and a Woo hiccup never blocks the OMS.
+export function markWooCompleted(order, trackingNumber) {
+  if (order?.source !== 'Website' || !order?.woo_order_id || order?.woo_completed_at) return
   authHeaders().then(h =>
     fetch('/api/woo-shipped', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...h },
-      body: JSON.stringify({ wooOrderId: order.woo_order_id, trackingNumber: order.tracking_number || '' })
+      body: JSON.stringify({
+        orderId: order.id,
+        wooOrderId: order.woo_order_id,
+        trackingNumber: trackingNumber || order.tracking_number || '',
+      })
     })
   ).catch(() => {})
+}
+
+// Fallback for orders dispatched without an OMS-created label (e.g. another
+// carrier): completing the stage still closes the WooCommerce order.
+export function notifyWooShipped(order, newStage) {
+  if (newStage !== 'Shipped to Customer') return
+  markWooCompleted(order)
 }
 
 export async function fetchStock() {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Btn from '../components/Btn'
-import { updateOrder } from '../lib/api'
+import { updateOrder, markWooCompleted } from '../lib/api'
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import { getOrderItems, itemThumb } from '../lib/orderItems'
@@ -41,7 +41,9 @@ export default function UsOrdersPage({ orders, setOrders, role }) {
     try {
       const updated = await updateOrder(o.id, { tracking_number: tracking })
       setOrders(prev => prev.map(x => x.id === o.id ? updated : x))
-      toast('Tracking saved')
+      // Juan's tracking = the order really shipped → close it in WooCommerce.
+      markWooCompleted(updated, tracking)
+      toast(updated.woo_order_id ? 'Tracking saved — WooCommerce marked Completed' : 'Tracking saved')
     } catch (e) { toast(e.message, 'error') }
   }
 
