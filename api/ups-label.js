@@ -267,18 +267,24 @@ async function createLabel(token, order, serviceCode, dutiesPayer, baseUrl = 'ht
 // Place it on a real A4 page at its exact physical size instead: it then prints
 // correctly at any scale setting, and the rest of the sheet is free to fold.
 async function labelOnA4(labelBase64) {
-  const { PDFDocument } = await import('pdf-lib');
+  const { PDFDocument, degrees } = await import('pdf-lib');
   const A4_W = 595.28, A4_H = 841.89;   // points
-  const LABEL_W = 288, LABEL_H = 432;   // 102 x 152 mm
+  const LABEL_W = 288, LABEL_H = 432;   // 102 x 152 mm, as UPS returns it
   const MARGIN = 28.35;                 // 10 mm
   const out = await PDFDocument.create();
   const page = out.addPage([A4_W, A4_H]);
   const [embedded] = await out.embedPdf(Buffer.from(labelBase64, 'base64'), [0]);
+
+  // The sheet is folded in half (A4 -> A5, 148.5 mm) to go in a C5 pocket, and
+  // the label is 152 mm tall — upright it would be creased by the fold. Rotate
+  // it 90° so it measures 152 x 102 mm and sits entirely in the top half.
+  // Rotating 90° CCW about (x,y) puts the content in [x-height, x] x [y, y+width].
   page.drawPage(embedded, {
-    x: MARGIN,
-    y: A4_H - MARGIN - LABEL_H,   // top-left corner of the sheet
+    x: MARGIN + LABEL_H,
+    y: A4_H - MARGIN - LABEL_W,
     width: LABEL_W,
     height: LABEL_H,
+    rotate: degrees(90),
   });
   const bytes = await out.save();
   return Buffer.from(bytes).toString('base64');

@@ -28,16 +28,16 @@ const ok = (n, c, extra='') => { console.log(`${c ? '  PASS' : '  FAIL'}  ${n}${
 printPackingSlip({ ...base, ship_from_stock: true, stock_item: { model: 'W205', type: 'Vinyl', colour: 'Black' } });
 const stockHtml = captured;
 
-ok('stock order shows the banner', stockHtml.includes('FROM SWEDEN INVENTORY'));
-ok('banner names the stock item', /Stock item:\s*W205 · Vinyl · Black/.test(stockHtml));
-ok('line item carries FROM INVENTORY badge', stockHtml.includes('>FROM INVENTORY<'));
-ok('banner sits above the items table', stockHtml.indexOf('FROM SWEDEN INVENTORY') < stockHtml.indexOf('<table>'));
+ok('stock order shows one concise inventory line',
+   /FROM INVENTORY:\s*W205 · Vinyl · Black/.test(stockHtml));
+ok('no verbose explanation text', !/picked from stock|Stock item:/.test(stockHtml));
+ok('line appears above the items table',
+   stockHtml.indexOf('FROM INVENTORY') < stockHtml.indexOf('<table>'));
 
 printPackingSlip({ ...base, ship_from_stock: false });
 const normalHtml = captured;
 
-ok('normal order has NO banner', !normalHtml.includes('FROM SWEDEN INVENTORY'));
-ok('normal order has NO badge', !normalHtml.includes('>FROM INVENTORY<'));
+ok('normal order shows nothing about inventory', !normalHtml.includes('FROM INVENTORY'));
 ok('normal order still renders items', normalHtml.includes('Mercedes-Benz C-Class'));
 
 console.log('\n' + (bad ? 'RESULT: FAILURES' : 'RESULT: ALL PASSED'));
