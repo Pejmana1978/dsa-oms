@@ -262,6 +262,28 @@ async function createLabel(token, order, serviceCode, dutiesPayer, baseUrl = 'ht
   return await res.json();
 }
 
+// UPS returns the label as a 4x6 inch (102x152 mm) page. Printed straight, a
+// print dialog set to "fit to page" blows it up to fill the whole A4 sheet.
+// Place it on a real A4 page at its exact physical size instead: it then prints
+// correctly at any scale setting, and the rest of the sheet is free to fold.
+async function labelOnA4(labelBase64) {
+  const { PDFDocument } = await import('pdf-lib');
+  const A4_W = 595.28, A4_H = 841.89;   // points
+  const LABEL_W = 288, LABEL_H = 432;   // 102 x 152 mm
+  const MARGIN = 28.35;                 // 10 mm
+  const out = await PDFDocument.create();
+  const page = out.addPage([A4_W, A4_H]);
+  const [embedded] = await out.embedPdf(Buffer.from(labelBase64, 'base64'), [0]);
+  page.drawPage(embedded, {
+    x: MARGIN,
+    y: A4_H - MARGIN - LABEL_H,   // top-left corner of the sheet
+    width: LABEL_W,
+    height: LABEL_H,
+  });
+  const bytes = await out.save();
+  return Buffer.from(bytes).toString('base64');
+}
+
 async function sendExportEmail(trackingNumber, invoiceBase64) {
   // Preferred: send through the company's own Google Workspace account —
   // no sender-domain DNS setup needed, and the email lands in Gmail's Sent
@@ -311,6 +333,27 @@ async function sendExportEmail(trackingNumber, invoiceBase64) {
 }
 
 export default async function handler(req, res) {
+  // Health check: proves the PDF layout engine actually runs in THIS runtime
+  // (a library can pass every local test and still fail on Vercel). No auth
+  // needed and no user data — it lays a blank page onto A4 and reports the size.
+  if (req.method === 'GET') {
+    try {
+      const { PDFDocument } = await import('pdf-lib');
+      const probe = await PDFDocument.create();
+      probe.addPage([288, 432]);                       // a 4x6 stand-in label
+      const wrapped = await labelOnA4(Buffer.from(await probe.save()).toString('base64'));
+      const check = await PDFDocument.load(Buffer.from(wrapped, 'base64'));
+      const { width, height } = check.getPage(0).getSize();
+      const isA4 = Math.round(width) === 595 && Math.round(height) === 842;
+      return res.status(isA4 ? 200 : 500).json({
+        labelEngine: 'pdf-lib', works: isA4,
+        pageMm: `${Math.round(width * 25.4 / 72)}x${Math.round(height * 25.4 / 72)}`,
+      });
+    } catch (e) {
+      return res.status(500).json({ labelEngine: 'pdf-lib', works: false, error: e.message });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).end();
   if (!(await requireUser(req, res))) return;
   const { order, validateOnly, quoteOnly, serviceCode, dutiesPayer } = req.body;
@@ -366,7 +409,17 @@ export default async function handler(req, res) {
 
     const shipment = result.ShipmentResponse?.ShipmentResults;
     const trackingNumber = shipment?.ShipmentIdentificationNumber;
-    const labelBase64 = shipment?.PackageResults?.ShippingLabel?.GraphicImage;
+    const rawLabel = shipment?.PackageResults?.ShippingLabel?.GraphicImage;
+    // Wrap onto A4 so it prints at the correct physical size; if that ever
+    // fails, fall back to the raw label rather than losing the shipment.
+    let labelBase64 = rawLabel;
+    if (rawLabel) {
+      try {
+        labelBase64 = await labelOnA4(rawLabel);
+      } catch (e) {
+        console.error('A4 label wrap failed, using raw label:', e.message);
+      }
+    }
     // Surface what UPS will actually charge: negotiated (contract) rate when
     // applied, published otherwise — so a missing discount is visible instantly.
     const negotiated = shipment?.NegotiatedRateCharges?.TotalCharge;
