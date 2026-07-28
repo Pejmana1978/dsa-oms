@@ -340,7 +340,9 @@ export default async function handler(req, res) {
     try {
       const { PDFDocument } = await import('pdf-lib');
       const probe = await PDFDocument.create();
-      probe.addPage([288, 432]);                       // a 4x6 stand-in label
+      const probePage = probe.addPage([288, 432]);     // a 4x6 stand-in label
+      // Must draw something: pdf-lib refuses to embed a page with no contents.
+      probePage.drawRectangle({ x: 10, y: 10, width: 100, height: 40 });
       const wrapped = await labelOnA4(Buffer.from(await probe.save()).toString('base64'));
       const check = await PDFDocument.load(Buffer.from(wrapped, 'base64'));
       const { width, height } = check.getPage(0).getSize();
