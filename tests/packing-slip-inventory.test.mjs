@@ -2,7 +2,7 @@
 // inventory marking appears exactly where it should.
 import { readFileSync } from 'node:fs';
 
-const src = readFileSync('new URL('../src/lib/printPackingSlip.js', import.meta.url)', 'utf8')
+const src = readFileSync(new URL('../src/lib/printPackingSlip.js', import.meta.url), 'utf8')
   .replace(/^import .*$/gm, '')
   .replace(/^export /gm, '');
 
