@@ -99,6 +99,40 @@ function specFromLineItem(li: any) {
   return { color, position }
 }
 
+// After checkout the customer is sent to a form for their VIN ("Seat Code")
+// and photos of the seats. Cloudberry writes each submission onto the order as
+// `seatfactory_submissions` — [{entry_id, submitted_at, seat_code, images[]}].
+// Submissions arrive AFTER the order is placed (and can be repeated), so this
+// is read on every sync, not just at import.
+function extractSubmissions(o: any) {
+  const meta = (o.meta_data || []).find((m: any) => m?.key === "seatfactory_submissions")
+  const subs: any[] = Array.isArray(meta?.value) ? meta.value : []
+  if (subs.length === 0) return { vin: "", photos: [] as any[], extraVins: [] as string[] }
+
+  // Newest submission wins — a resubmission is the customer correcting himself.
+  const sorted = [...subs].sort((a, b) =>
+    String(b?.submitted_at || "").localeCompare(String(a?.submitted_at || "")))
+  const codes = sorted.map(s => String(s?.seat_code || "").trim()).filter(Boolean)
+  const vin = codes[0] || ""
+  // If the customer sent genuinely different codes, the operator must decide.
+  const extraVins = [...new Set(codes.slice(1))].filter(c => c !== vin)
+
+  const seen = new Set<string>()
+  const photos: any[] = []
+  for (const sub of sorted) {
+    for (const url of (Array.isArray(sub?.images) ? sub.images : [])) {
+      const u = String(url || "").trim()
+      if (!u || seen.has(u)) continue
+      seen.add(u)
+      const raw = decodeURIComponent(u.split("?")[0].split("/").pop() || "photo.jpg")
+      // The OMS decides "is this an image?" from the file extension in `name`.
+      const name = /\.(jpe?g|png|gif|webp)$/i.test(raw) ? raw : raw + ".jpg"
+      photos.push({ url: u, name })
+    }
+  }
+  return { vin, photos, extraVins }
+}
+
 async function wooFetch(path: string) {
   const res = await fetch(`${WOO_URL}/wp-json/wc/v3${path}`, {
     headers: wooHeaders(),
@@ -129,6 +163,7 @@ serve(async () => {
     let imported = 0
     let importedUsCa = 0
     let linked = 0        // pre-existing manual orders newly linked to Woo
+    let submissionsApplied = 0  // VIN/photos arriving after the order
     for (const o of wooOrders) {
       // Destination country decides the team — SHIPPING address, never billing
       // (a US customer shipping to Germany is a DSA order, and vice versa).
@@ -137,13 +172,17 @@ serve(async () => {
       const isUsTeam = US_TEAM_COUNTRIES.includes(country)
       const ref = String(o.number)
       const { data: existing } = await supabase
-        .from("orders").select("id, woo_order_id, fulfillment_team").eq("order_ref", ref).single()
+        .from("orders").select("id, woo_order_id, fulfillment_team, vin, photos").eq("order_ref", ref).single()
       if (existing) {
         // Orders entered by hand before the sync existed have no woo_order_id,
         // so the shipped-status write-back to WooCommerce would silently do
         // nothing. Backfill the link (and the US/CA flag) instead of skipping.
         const patch: Record<string, unknown> = {}
         if (!existing.woo_order_id) patch.woo_order_id = o.id
+        // VIN / photos usually land after the order was already imported.
+        const sub = extractSubmissions(o)
+        if (sub.vin && !existing.vin) patch.vin = sub.vin
+        if (sub.photos.length && !(existing.photos || []).length) patch.photos = sub.photos
         if (isUsTeam && !existing.fulfillment_team) {
           patch.fulfillment_team = "us_team"
           patch.us_status = "received"
@@ -151,6 +190,7 @@ serve(async () => {
         if (Object.keys(patch).length > 0) {
           await supabase.from("orders").update(patch).eq("id", existing.id)
           linked++
+          if (patch.vin || patch.photos) submissionsApplied++
         }
         continue
       }
@@ -185,6 +225,8 @@ serve(async () => {
           item_notes: "",
         })
       }
+      const sub = extractSubmissions(o)
+      if (sub.vin) for (const it of itemsDetail) if (!it.vin) it.vin = sub.vin
       const totalQuantity = itemsDetail.reduce((n, it) => n + (it.quantity || 1), 0) || 1
       const first = itemsDetail[0] || {}
       const address = [ship.address_1, ship.address_2, ship.city, ship.state, ship.postcode, country]
@@ -209,13 +251,16 @@ serve(async () => {
         stage: "New",
         fulfillment_team: isUsTeam ? "us_team" : null,
         us_status: isUsTeam ? "received" : null,
-        notes: o.customer_note || "",
+        vin: sub.vin || null,
+        photos: sub.photos,
+        notes: [o.customer_note || "",
+                sub.extraVins.length ? `\u26a0 Customer also submitted a different Seat Code: ${sub.extraVins.join(", ")}` : ""]
+               .filter(Boolean).join("\n"),
         thumbnail: first.thumbnail || "",
         sale_amount: o.total ? parseFloat(o.total) : null,
         sale_currency: o.currency || null,
         shipping_cost: o.shipping_total ? parseFloat(o.shipping_total) : null,
         order_date: (o.date_created || "").slice(0, 10) || new Date().toISOString().slice(0, 10),
-        photos: [],
         items: itemsDetail,
       })
       if (!error) { imported++; if (isUsTeam) importedUsCa++ }
@@ -272,7 +317,7 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, usAutoShipped, cancelled, refunded, total: wooOrders.length }), {
+    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, submissionsApplied, usAutoShipped, cancelled, refunded, total: wooOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {
