@@ -78,6 +78,22 @@ function extractTracking(o: any): string {
 // The shop records each item's real options as product attributes (Colour /
 // Position / Seat Side) — far more reliable than parsing them out of the
 // product title, which is all the eBay side can do.
+// Website product names follow a fixed shape:
+//   "<CAR> – Exact Match Replacement Seat Cover[ - <options>]"
+// e.g. "Porsche 911 1998-2005 (996) – Exact Match Replacement Seat Cover".
+// So the car is simply everything before the dash — far more reliable than the
+// eBay title parser, which has to guess and gets "Exact Match Replacement Seat".
+function carFromProductName(name: string): string {
+  const t = String(name || "").trim()
+  if (!t) return ""
+  // Split on an en/em dash, or a hyphen surrounded by spaces (never on the
+  // hyphens inside "Mercedes-Benz" or "1998-2005").
+  const head = t.split(/\s+[–—]\s+|\s+-\s+/)[0].trim()
+  // Guard: if the head is the product wording rather than a car, keep nothing.
+  if (/replacement seat|seat cover|exact match/i.test(head)) return ""
+  return head
+}
+
 function specFromLineItem(li: any) {
   const attrs: Record<string, string> = {}
   for (const m of (li.meta_data || [])) {
@@ -159,11 +175,13 @@ serve(async () => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
 
     // New paid orders awaiting fulfillment.
+    const productCache = new Map<number, any>()
     const wooOrders = await wooFetchAll("status=processing")
     let imported = 0
     let importedUsCa = 0
     let linked = 0        // pre-existing manual orders newly linked to Woo
     let submissionsApplied = 0  // VIN/photos arriving after the order
+    let repaired = 0            // items fixed up (car name / shop link)
     for (const o of wooOrders) {
       // Destination country decides the team — SHIPPING address, never billing
       // (a US customer shipping to Germany is a DSA order, and vice versa).
@@ -172,7 +190,7 @@ serve(async () => {
       const isUsTeam = US_TEAM_COUNTRIES.includes(country)
       const ref = String(o.number)
       const { data: existing } = await supabase
-        .from("orders").select("id, woo_order_id, fulfillment_team, vin, photos").eq("order_ref", ref).single()
+        .from("orders").select("id, woo_order_id, fulfillment_team, vin, photos, items").eq("order_ref", ref).single()
       if (existing) {
         // Orders entered by hand before the sync existed have no woo_order_id,
         // so the shipped-status write-back to WooCommerce would silently do
@@ -183,6 +201,43 @@ serve(async () => {
         const sub = extractSubmissions(o)
         if (sub.vin && !existing.vin) patch.vin = sub.vin
         if (sub.photos.length && !(existing.photos || []).length) patch.photos = sub.photos
+
+        // Repair items imported before the website-specific parsing existed:
+        // the car field held the product wording ("Exact Match Replacement
+        // Seat") and there was no shop link. Only touched when clearly wrong,
+        // so a car corrected by hand is never overwritten.
+        const storedItems = Array.isArray(existing.items) ? existing.items : []
+        if (storedItems.length) {
+          const byId = new Map<string, any>()
+          for (const li of (o.line_items || [])) byId.set(String(li.product_id || ""), li)
+          let touched = false
+          const repaired = await Promise.all(storedItems.map(async (it: any) => {
+            const li = byId.get(String(it.item_id || "")) || null
+            const next = { ...it }
+            const looksWrong = !it.car || /exact match|replacement seat|seat cover/i.test(String(it.car))
+            if (li && looksWrong) {
+              const fixed = carFromProductName(li.name)
+              if (fixed && fixed !== it.car) { next.car = fixed; touched = true }
+            }
+            if (li && !it.item_url && li.product_id) {
+              let prod = productCache.get(li.product_id)
+              if (prod === undefined) {
+                try { prod = await wooFetch(`/products/${li.product_id}`) } catch { prod = null }
+                productCache.set(li.product_id, prod)
+              }
+              if (prod?.permalink) { next.item_url = prod.permalink; touched = true }
+            }
+            return next
+          }))
+          if (touched) {
+            patch.items = repaired
+            if (repaired[0]?.car) {
+              patch.car = repaired.length > 1
+                ? `${repaired[0].car} [+${repaired.length - 1} more]`
+                : repaired[0].car
+            }
+          }
+        }
         if (isUsTeam && !existing.fulfillment_team) {
           patch.fulfillment_team = "us_team"
           patch.us_status = "received"
@@ -191,6 +246,7 @@ serve(async () => {
           await supabase.from("orders").update(patch).eq("id", existing.id)
           linked++
           if (patch.vin || patch.photos) submissionsApplied++
+          if (patch.items) repaired++
         }
         continue
       }
@@ -198,11 +254,17 @@ serve(async () => {
       const itemsDetail: any[] = []
       for (const li of (o.line_items || [])) {
         let thumb = li.image?.src || ""
-        if (!thumb && li.product_id) {
-          try {
-            const p = await wooFetch(`/products/${li.product_id}`)
-            thumb = p.images?.[0]?.src || ""
-          } catch { /* thumbnail is nice-to-have */ }
+        let itemUrl = ""
+        if (li.product_id) {
+          // One lookup gives us both the shop link and (if missing) the image.
+          const cached = productCache.get(li.product_id)
+          let prod = cached
+          if (prod === undefined) {
+            try { prod = await wooFetch(`/products/${li.product_id}`) } catch { prod = null }
+            productCache.set(li.product_id, prod)
+          }
+          itemUrl = prod?.permalink || ""
+          if (!thumb) thumb = prod?.images?.[0]?.src || ""
         }
         const spec = parseSpec(li.name || "")
         const attr = specFromLineItem(li)   // structured attributes win
@@ -212,10 +274,11 @@ serve(async () => {
           price: li.total ? parseFloat(li.total) : null,
           currency: o.currency || null,
           item_id: String(li.product_id || ""),
+          item_url: itemUrl,
           sku: li.sku || "",
           thumbnail: thumb,
           custom_thumbnail: "",
-          car: spec.car,
+          car: carFromProductName(li.name) || spec.car,
           vin: "",
           year: "",
           position: attr.position.length ? attr.position : spec.position,
@@ -242,8 +305,8 @@ serve(async () => {
         phone: o.billing?.phone || "",
         address,
         car: itemsDetail.length > 1
-          ? `${first.title || "See order"} [+${itemsDetail.length - 1} more]`
-          : (first.title || "See order"),
+          ? `${first.car || first.title || "See order"} [+${itemsDetail.length - 1} more]`
+          : (first.car || first.title || "See order"),
         seats: "",
         quantity: totalQuantity,
         color: "",
@@ -317,7 +380,7 @@ serve(async () => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, submissionsApplied, usAutoShipped, cancelled, refunded, total: wooOrders.length }), {
+    return new Response(JSON.stringify({ success: true, imported, importedUsCa, linked, submissionsApplied, repaired, usAutoShipped, cancelled, refunded, total: wooOrders.length }), {
       headers: { "Content-Type": "application/json" },
     })
   } catch (e) {

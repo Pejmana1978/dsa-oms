@@ -6,7 +6,7 @@ import { STAGES, POSITION_OPTIONS, MATERIAL_OPTIONS } from '../lib/constants'
 import StockPicker from './StockPicker'
 import { updateOrder, uploadPhoto, deletePhoto, takeStock, returnStock, authHeaders, notifyWooShipped } from '../lib/api'
 import { useToast } from './Toast'
-import { getOrderItems, itemThumb } from '../lib/orderItems'
+import { getOrderItems, itemThumb, itemLink } from '../lib/orderItems'
 import { buildSheetHTML } from '../lib/productionSheet'
 import { printPackingSlip } from '../lib/printPackingSlip'
 const TABS = ['Details', 'Email / SMS', 'Print / Export']
@@ -367,7 +367,7 @@ export default function OrderModal({ order, onClose, onUpdated, role }) {
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {it.title && (
                       <div style={{ fontSize: 11, color: '#888' }}>{it.title}
-                        {it.item_id && <a href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' style={{ marginLeft: 8, color: '#185FA5', textDecoration: 'none' }}>listing →</a>}
+                        {itemLink(it, order) && <a href={itemLink(it, order)} target='_blank' rel='noreferrer' style={{ marginLeft: 8, color: '#185FA5', textDecoration: 'none' }}>listing →</a>}
                         {it.sku && <span style={{ marginLeft: 8, color: '#bbb' }}>SKU {it.sku}</span>}
                       </div>
                     )}

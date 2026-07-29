@@ -6,7 +6,7 @@ import { updateOrder, deleteOrder, fetchOrders, authHeaders, notifyWooShipped } 
 import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
-import { getOrderItems, itemThumb } from '../lib/orderItems'
+import { getOrderItems, itemThumb, itemLink } from '../lib/orderItems'
 
 export default function OrdersPage({ orders, setOrders, role, filterRequest, onStageChange }) {
   const [q, setQ] = useState('')
@@ -205,8 +205,8 @@ export default function OrdersPage({ orders, setOrders, role, filterRequest, onS
                         <div style={{ fontSize: 12 }}>{its[0].title || its[0].car}</div>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#d97706' }}>⚠ {its.length} items in this order</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
-                          {its.map((it, i) => it.item_id && (
-                            <a key={i} href={'https://www.ebay.co.uk/itm/' + it.item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>Listing {i + 1} →</a>
+                          {its.map((it, i) => itemLink(it, o) && (
+                            <a key={i} href={itemLink(it, o)} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>Listing {i + 1} →</a>
                           ))}
                         </div>
                       </>
@@ -214,7 +214,7 @@ export default function OrdersPage({ orders, setOrders, role, filterRequest, onS
                     return <>
                       <div style={{ fontSize: 12 }}>{its[0].car || its[0].title || o.car}</div>
                       {its[0].color && <div style={{ fontSize: 10, color: '#aaa' }}>{its[0].color}</div>}
-                      {its[0].item_id && <a href={'https://www.ebay.co.uk/itm/' + its[0].item_id} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
+                      {itemLink(its[0], o) && <a href={itemLink(its[0], o)} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none' }}>View listing →</a>}
                     </>
                   })()}
                   {o.source === 'eBay' && o.order_ref && <a href={'https://www.ebay.co.uk/mesh/ord/details?orderid=' + o.order_ref} target='_blank' rel='noreferrer' onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#185FA5', textDecoration: 'none', display: 'block', marginTop: 2 }}>View order →</a>}

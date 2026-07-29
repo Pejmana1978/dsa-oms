@@ -6,7 +6,7 @@
 
 export const EMPTY_ITEM = {
   // eBay identity (set by sync, not edited)
-  title: '', item_id: '', sku: '', quantity: 1, price: null, currency: '',
+  title: '', item_id: '', item_url: '', sku: '', quantity: 1, price: null, currency: '',
   // two thumbnails: eBay original + optional operator override
   thumbnail: '', custom_thumbnail: '',
   // per-item production spec (editable)
@@ -45,6 +45,14 @@ export function getOrderItems(o) {
 
 export function isMultiItem(o) {
   return Array.isArray(o?.items) && o.items.length > 1
+}
+
+// Where "view listing" should go. Website orders carry their own shop URL;
+// eBay orders only have a numeric item id, so build the eBay link from it.
+export function itemLink(it, order) {
+  if (it?.item_url) return it.item_url
+  if (it?.item_id && order?.source === 'eBay') return 'https://www.ebay.co.uk/itm/' + it.item_id
+  return ''
 }
 
 // Display thumbnail = operator override if set, else the eBay original.
