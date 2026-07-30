@@ -25,9 +25,10 @@ export default function ProductionPage({ orders, setOrders, role }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [showLightbox])
 
-  // Verified orders live on their own page until they're sent to production —
-  // listing them here made the queue show more orders than the badge count.
-  const prod = orders.filter(o => ['In Production', 'Production Complete'].includes(o.stage) && !o.archived && !isUsTeamOrder(o))
+  // Exactly the stage this page acts on — same rule as the sidebar badge.
+  // Verified orders wait on their own page; Production Complete orders live
+  // on Shipping (USA). Listing either here made the queue exceed the badge.
+  const prod = orders.filter(o => o.stage === 'In Production' && !o.archived && !isUsTeamOrder(o))
 
   async function advance(id) {
     const o = orders.find(x => x.id === id)
