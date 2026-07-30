@@ -25,7 +25,9 @@ export default function ProductionPage({ orders, setOrders, role }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [showLightbox])
 
-  const prod = orders.filter(o => ['Verified', 'In Production', 'Production Complete'].includes(o.stage) && !o.archived && !isUsTeamOrder(o))
+  // Verified orders live on their own page until they're sent to production —
+  // listing them here made the queue show more orders than the badge count.
+  const prod = orders.filter(o => ['In Production', 'Production Complete'].includes(o.stage) && !o.archived && !isUsTeamOrder(o))
 
   async function advance(id) {
     const o = orders.find(x => x.id === id)
