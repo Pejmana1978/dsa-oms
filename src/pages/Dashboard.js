@@ -13,7 +13,7 @@ import ArchivePage from './ArchivePage'
 import StatsPage from './StatsPage'
 import UsersPage from './UsersPage'
 import UsOrdersPage from './UsOrdersPage'
-import { usAlertCount, openUsOrders } from '../lib/usOrders'
+import { usAlertCount, openUsOrders, isUsTeamOrder } from '../lib/usOrders'
 import CustomerServicePage from './CustomerServicePage'
 const NAV_ICONS = {
   orders: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.2"/><line x1="4" y1="5" x2="10" y2="5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="7.5" x2="10" y2="7.5" stroke="currentColor" strokeWidth="1.1"/><line x1="4" y1="10" x2="7" y2="10" stroke="currentColor" strokeWidth="1.1"/></svg>,
@@ -59,7 +59,9 @@ export default function Dashboard() {
     setLoading(false)
   }
   const active = orders.filter(o => !o.archived)
-  const pendingCount = active.filter(o => o.stage === 'New').length
+  // Excludes US/Canada orders — they have their own queue and must not
+  // show up as new work for the DSA team.
+  const pendingCount = active.filter(o => o.stage === 'New' && !isUsTeamOrder(o)).length
   const verifiedCount = active.filter(o => o.stage === 'Verified').length
   const prodCount = active.filter(o => o.stage === 'In Production').length
   const shipUSCount = active.filter(o => o.stage === 'Production Complete').length

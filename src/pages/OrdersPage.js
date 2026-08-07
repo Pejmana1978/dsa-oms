@@ -7,6 +7,7 @@ import { useToast } from '../components/Toast'
 import OrderModal from '../components/OrderModal'
 import NewOrderModal from '../components/NewOrderModal'
 import { getOrderItems, itemThumb, itemLink } from '../lib/orderItems'
+import { isUsTeamOrder } from '../lib/usOrders'
 
 export default function OrdersPage({ orders, setOrders, role, filterRequest, onStageChange }) {
   const [q, setQ] = useState('')
@@ -65,14 +66,21 @@ export default function OrdersPage({ orders, setOrders, role, filterRequest, onS
 
   const stageCounts = useMemo(() => {
     const active = orders.filter(o => !o.archived)
+    // US/Canada orders go straight to Juan and never enter the Swedish stage
+    // flow, so they are counted only under All — a stage chip that includes
+    // them tells the DSA fulfiller there is work that is not theirs.
+    const mine = active.filter(o => !isUsTeamOrder(o))
     const c = { All: active.length }
-    STAGES.forEach(s => { c[s] = active.filter(o => o.stage === s).length })
+    STAGES.forEach(s => { c[s] = mine.filter(o => o.stage === s).length })
     return c
   }, [orders])
 
   const filtered = useMemo(() => {
     return orders.filter(o => {
       if (o.archived) return false
+      // Same rule as the counts: a stage view is the Swedish workflow only.
+      // They stay visible under All so they remain searchable in one place.
+      if (stageFilter !== 'All' && isUsTeamOrder(o)) return false
       if (stageFilter !== 'All' && o.stage !== stageFilter) return false
       if (srcFilter && o.source !== srcFilter) return false
       if (q) {
